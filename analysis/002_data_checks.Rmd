@@ -1,0 +1,59 @@
+---
+title: "002 data checks"
+author: "Me"
+date: "06/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load and run checks previously decided upon for these sorts of data
+
+
+```{r}
+
+library(pepdiff)
+
+
+d <- import_data(here::here("cleaned", "cleaned_data.csv"), 
+                 gene_id = "molecule_list_name", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+```
+
+## Check number of missing data points
+
+Includes at tech rep level
+
+Missing data
+
+```{r}
+missing_peptides_plot(d)
+```
+
+Replicate level
+```{r}
+times_measured(d)
+times_measured_plot(d)
+```
+
+
+## Look at similarity of samples
+
+
+```{r}
+plot_pca(d)
+plot_kmeans(d)
+```
+
+## Look at distribution of quantifications
+
+```{r}
+plot_quant_distributions(d)
+plot_quant_distributions(d, log = TRUE)
+norm_qqplot(d)
+norm_qqplot(d, log = TRUE)
+```

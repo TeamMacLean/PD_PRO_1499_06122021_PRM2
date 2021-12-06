@@ -1,0 +1,47 @@
+---
+title: "001 data preparation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+```
+
+## Load and inspect Paul's `.xlsx` document
+
+```{r}
+xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics.xlsx")
+xlmvp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_missing_values.xlsx")
+
+readxl::excel_sheets(xlp)
+
+xld <- readxl::read_excel(xlp, sheet="Data_for_informatics")
+xld 
+
+xld_mv <- readxl::read_excel(xlmvp, sheet="missing values")
+xld_mv
+```
+
+
+Not sure at this stage what is in the missing values sheet, I'll have to check with Paul. For now I'll work on getting the main data into shape for the rest of the pipeline. 
+
+
+```{r}
+cleaned <- xld %>% dplyr::select( `Replicate Name`, `Molecule List Name`, `Total Area`, `Peptide Modified Sequence`) %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>% 
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep", "tech_rep", "misc"), sep=", ") %>%
+  dplyr::mutate(
+    timepoint = as.numeric(dplyr::if_else(timepoint == 'Spores', "0", timepoint)),
+    bio_rep = as.numeric(stringr::str_sub(bio_rep, 2,-1)),
+    tech_rep = as.numeric(stringr::str_sub(tech_rep, 2,-1))
+  ) %>% 
+  dplyr::select(molecule_list_name, peptide_modified_sequence, genotype, timepoint, bio_rep, tech_rep, total_area)
+
+cleaned
+
+unique(cleaned$timepoint)
+readr::write_csv(cleaned, here::here("cleaned", "cleaned_data.csv"))
+```
+

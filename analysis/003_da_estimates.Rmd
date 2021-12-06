@@ -1,0 +1,75 @@
+---
+title: "003_diff_exp"
+author: "Me"
+date: "06/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Differential peptide abundance
+
+Perform differential abundance estimation using bootstrap and rank product methods
+
+```{r}
+library(pepdiff)
+d <- import_data(here::here("cleaned", "cleaned_data.csv"), 
+                 gene_id = "molecule_list_name", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+
+comparisons <- data.frame(
+  control = rep("Guy11", 6),
+  c_seconds = c(0,1,1.5,2,4,6),
+  treatment = rep("dpmk1", 6),
+  t_seconds = c(0,1,1.5,2,4,6)
+)
+
+many <- compare_many(d, comparisons, metrics = c("bootstrap_t", "rank_product"), iters=10000)
+many
+```
+
+
+## Plot result heatmaps
+
+```{r,eval=TRUE, fig.height=10, fig.width=10}
+
+col_order <- c("Guy11_0-dpmk1_0",
+               "Guy11_1-dpmk1_1",
+               "Guy11_1.5-dpmk1_1.5",
+               "Guy11_2-dpmk1_2",
+               "Guy11_4-dpmk1_4",
+               "Guy11_6-dpmk1_6")
+
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(-2, 2, length.out = 11),
+                           rev(RColorBrewer::brewer.pal(11, "RdBu"))
+                         ),
+  title = "Log 2 Fold Change")
+
+
+plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order)
+ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
+
+plot_heatmap(many, metric = "rank_product", log = TRUE)
+ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
+```
+
+```{r, fig.height=10,fig.width=10}
+#add colour even when the point isn't significant
+plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order, only_sig_points = FALSE)
+ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
+```
+
+```{r, fig.width=8}
+volcano_plot(many, metric = "bootstrap_t")
+```
+
+
+```{r}
+writexl::write_xlsx(many, here::here("analysis","003_differential_abundance_estimates.xlsx"))
+```
