@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-## Within `Guy11`
+## Within `Guy11` and `dpmk1` concatenated
 
 ### Differential peptide abundance
 
@@ -25,20 +25,23 @@ d <- import_data(here::here("cleaned", "cleaned_data.csv"),
                  seconds = "timepoint")
 
 comparisons <- data.frame(
-  control = rep("Guy11", 5),
-  c_seconds = rep(0, 5),
-  treatment = rep("Guy11", 5),
-  t_seconds = c(1,1.5,2,4,6)
+  control = c(rep("Guy11", 5),rep("dpmk1", 5)),
+  c_seconds = rep(0, 10),
+  treatment = c(rep("Guy11", 5), rep("dpmk1", 5)),
+  t_seconds = rep(c(1,1.5,2,4,6), 2)
 )
 
 many <- compare_many(d, comparisons, metrics = c("bootstrap_t", "rank_product"), iters=10000)
-many
 ```
 
 
 ## Plot result heatmaps
 
-```{r,eval=TRUE, fig.height=10, fig.width=10}
+First from peptides called significant by `bootstrap_t` method, then by `rank product` method.
+
+Only peptides with at least one significant point are shown.
+
+```{r,eval=TRUE, fig.height=20, fig.width=10, }
 
 lgd <- ComplexHeatmap::Legend(direction = "horizontal",
   col_fun = circlize::colorRamp2(
@@ -48,75 +51,25 @@ lgd <- ComplexHeatmap::Legend(direction = "horizontal",
   title = "Log 2 Fold Change")
 
 
-plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order)
+ht <- plot_heatmap(many, metric = "bootstrap_t", log = TRUE, sig = 0.01)#,  col_order = col_order)
+ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
 ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
 
-plot_heatmap(many, metric = "rank_product", log = TRUE)
+
+ht <- plot_heatmap(many, metric = "rank_product", log = TRUE, sig=0.01)
+ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
 ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
 ```
 
-```{r, fig.height=10,fig.width=10}
-#add colour even when the point isn't significant
-plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order, only_sig_points = FALSE)
-ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
-```
+
 
 ```{r, fig.width=8}
 volcano_plot(many, metric = "bootstrap_t")
 ```
 
 
-```{r}
-writexl::write_xlsx(many, here::here("analysis","003_differential_abundance_Guy11_w_geno_estimates.xlsx"))
-```
-
-
-## Within `dpmk1`
-
 
 ```{r}
-comparisons <- data.frame(
-  control = rep("dpmk1", 5),
-  c_seconds = rep(0, 5),
-  treatment = rep("dpmk1", 5),
-  t_seconds = c(1,1.5,2,4,6)
-)
-
-many <- compare_many(d, comparisons, metrics = c("bootstrap_t", "rank_product"), iters=10000)
-many
+writexl::write_xlsx(many, here::here("analysis","003_differential_abundance_Guy110-dpmk1_w_geno_estimates.xlsx"))
 ```
 
-
-## Plot result heatmaps
-
-```{r,eval=TRUE, fig.height=10, fig.width=10}
-
-lgd <- ComplexHeatmap::Legend(direction = "horizontal",
-  col_fun = circlize::colorRamp2(
-                           seq(-2, 2, length.out = 11),
-                           rev(RColorBrewer::brewer.pal(11, "RdBu"))
-                         ),
-  title = "Log 2 Fold Change")
-
-
-plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order)
-ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
-
-plot_heatmap(many, metric = "rank_product", log = TRUE)
-ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
-```
-
-```{r, fig.height=10,fig.width=10}
-#add colour even when the point isn't significant
-plot_heatmap(many, metric = "bootstrap_t", log = TRUE)#,  col_order = col_order, only_sig_points = FALSE)
-ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
-```
-
-```{r, fig.width=8}
-volcano_plot(many, metric = "bootstrap_t")
-```
-
-
-```{r}
-writexl::write_xlsx(many, here::here("analysis","003_differential_abundance_dpmk_w_geno_estimates.xlsx"))
-```
