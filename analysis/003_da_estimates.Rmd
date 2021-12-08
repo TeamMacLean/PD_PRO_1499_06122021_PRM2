@@ -45,18 +45,18 @@ Only peptides with at least one significant point are shown.
 
 lgd <- ComplexHeatmap::Legend(direction = "horizontal",
   col_fun = circlize::colorRamp2(
-                           seq(-2, 2, length.out = 11),
+                           seq(-10, 10, length.out = 11),
                            rev(RColorBrewer::brewer.pal(11, "RdBu"))
                          ),
   title = "Log 2 Fold Change")
 
 
-ht <- plot_heatmap(many, metric = "bootstrap_t", log = TRUE, sig = 0.01)#,  col_order = col_order)
+ht <- plot_heatmap(many, metric = "bootstrap_t", log = TRUE, sig = 0.01, scale_min = -10, scale_max = 10)#,  col_order = col_order)
 ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
 ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
 
 
-ht <- plot_heatmap(many, metric = "rank_product", log = TRUE, sig=0.01)
+ht <- plot_heatmap(many, metric = "rank_product", log = TRUE, sig=0.01, scale_min = -10, scale_max = 10)
 ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
 ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
 ```
