@@ -1,0 +1,106 @@
+---
+title: "006 Bootstrap Analysis"
+author: "Dan MacLean"
+date: "25/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+knitr::opts_chunk$set(echo = TRUE)
+library(circlize)
+col_fun = colorRamp2(c(0, 0.0014), c( "white", "blue"))
+col_fun(seq(0, 10))
+```
+
+## Bootstrap Analysis on whole data set.
+
+Paul is happy that the replacement is working properly and that the bootstrap and ratio calculation process is also ok. We can move on to doing the analysis on the whole data set. We'll repeat the cleaning done previously.
+
+```{r}
+xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_2.xlsx")
+readxl::excel_sheets(xlp)
+
+xld <- readxl::read_excel(xlp, sheet="Data_for_informatics (2)")
+
+```
+
+
+### 'Tidy' the data
+
+Next step is to move the data from the current format into the 'tidy' format needed for any analysis
+
+```{r}
+
+cleaned <- xld %>% 
+  dplyr::select( `Replicate Name`, `Molecule List Name`, `Total Area`, `Peptide Modified Sequence`) %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>% 
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep", "tech_rep", "misc"), sep="_") %>%
+  dplyr::mutate(
+    timepoint = as.numeric(dplyr::if_else(timepoint == 'Spores', "0", timepoint)),
+    bio_rep = as.numeric(stringr::str_sub(bio_rep, 2,-1)),
+    tech_rep = as.numeric(stringr::str_sub(tech_rep, 2,-1))
+  ) %>% 
+  dplyr::select(molecule_list_name, peptide_modified_sequence, genotype, timepoint, bio_rep, tech_rep, total_area) %>% 
+  dplyr::filter(! molecule_list_name == "Library Peptides")
+
+cleaned
+```
+
+
+Now we can load in the alternative names and add those
+
+```{r}
+convert_names <- readxl::read_excel(here::here("raw", "New_gene_ID_names.xlsx"), sheet="Final")
+
+combined <- dplyr::left_join(cleaned, convert_names, by = c("molecule_list_name" = "old_gene_id", "peptide_modified_sequence"="old_peptide")) %>% 
+  dplyr::rename(gene_id = new_gene_id_and_position)
+
+
+readr::write_csv(combined, here::here("cleaned", "006_cleaned.csv"))
+```
+
+
+## Load the data into `pepdiff`
+
+```{r,eval=TRUE}
+library(pepdiff)
+pdiff <- import_data(here::here("cleaned", "006_cleaned.csv"),
+                 gene_id = "gene_id", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+pdiff
+```
+
+
+Looks good. Now we can do the bootstrap analysis
+
+
+```{r, eval=TRUE}
+comparisons <- data.frame(
+  control = c(rep("Guy11", 5),rep("dpmk1", 5)),
+  c_seconds = rep(0, 10),
+  treatment = c(rep("Guy11", 5), rep("dpmk1", 5)),
+  t_seconds = rep(c(1,1.5,2,4,6), 2)
+)
+
+many <- compare_many(pdiff, comparisons, metrics = c("bootstrap_t"), iters=10000)
+```
+
+
+
+Now a quick look at the volcano plots for all the comparisons.
+
+```{r, eval=TRUE, fig.width=8}
+volcano_plot(many, metric = "bootstrap_t")
+```
+
+
+
+```{r, eval=TRUE}
+writexl::write_xlsx(many, here::here("analysis","006_differential_abundance_Guy110-dpmk1_w_geno_estimates.xlsx"))
+save(many, file=here::here("analysis","many.rda"))
+```
+

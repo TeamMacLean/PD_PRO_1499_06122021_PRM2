@@ -1,0 +1,257 @@
+---
+title: "004_troubleshooting.Rmd"
+author: "Dan MacLean"
+date: "07/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+knitr::opts_chunk$set(echo = TRUE)
+library(circlize)
+col_fun = colorRamp2(c(0, 0.0014), c( "white", "blue"))
+col_fun(seq(0, 10))
+
+
+```
+
+## Load original data from Paul
+
+First step is to load the data that Paul provided, specifically the file `M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics.xlsx`
+
+and the sheet `Data_for_informatics`. Nothing is done with the sheet `missing_values` as the format is undescribed and I assume its extraneous. 
+
+```{r}
+xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics.xlsx")
+readxl::excel_sheets(xlp)
+
+xld <- readxl::read_excel(xlp, sheet="Data_for_informatics")
+xld 
+
+```
+
+
+### 'Tidy' the data
+
+Next step is to move the data from the current format into the 'tidy' format needed for any analysis
+
+```{r}
+
+cleaned <- xld %>% 
+  dplyr::select( `Replicate Name`, `Molecule List Name`, `Total Area`, `Peptide Modified Sequence`) %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>% 
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep", "tech_rep", "misc"), sep=", ") %>%
+  dplyr::mutate(
+    timepoint = as.numeric(dplyr::if_else(timepoint == 'Spores', "0", timepoint)),
+    bio_rep = as.numeric(stringr::str_sub(bio_rep, 2,-1)),
+    tech_rep = as.numeric(stringr::str_sub(tech_rep, 2,-1))
+  ) %>% 
+  dplyr::select(molecule_list_name, peptide_modified_sequence, genotype, timepoint, bio_rep, tech_rep, total_area)
+
+cleaned
+```
+
+The data is large, so for this close walkthrough, I'll use a smaller subset. Having looked ahead I know that the peptide `"AAEEDVTTT[+80]PR"` has sparse information, that `"KLS[+80]ASGS[+80]PGSVNLGR"` has better information, that `"QTRT[+80]PS[+80]PASNGPAPLGVAEGPITPR"` has full information, that `"RLS[+80]FGDDQEER"` is of interest from Paul's PPT, as is `VTS1` `"SNDNSGQNPLS[+80]PGM[+16]ISPNVVM[+16]VDEHGR"`. So I'll pull these out and use them.
+
+```{r}
+keepers <- c("AAEEDVTTT[+80]PR","KLS[+80]ASGS[+80]PGSVNLGR","QTRT[+80]PS[+80]PASNGPAPLGVAEGPITPR",
+             "RLS[+80]FGDDQEER", "SNDNSGQNPLS[+80]PGM[+16]ISPNVVM[+16]VDEHGR")
+
+cleaned_small <- dplyr::filter(cleaned, peptide_modified_sequence %in% keepers)
+dplyr::arrange(cleaned_small, desc(total_area) )
+readr::write_csv(cleaned_small, here::here("cleaned", "004_selected_ts_1.csv")) %>% dplyr::select(total_area)
+```
+
+### Load into `pepdiff` data stucture
+
+```{r}
+library(pepdiff)
+pdiff <- import_data(here::here("cleaned", "004_selected_ts_1.csv"),
+                 gene_id = "molecule_list_name", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+pdiff
+```
+
+
+This is where we would normally start from. The first step is to get the data into a matrix for analysis. I've been doing this with this function `matrix_data()`. Note that the first step of this is `combine_tech_reps()` which performs the action of replacing any missing tech rep data with any other tech rep data for that sample and bio-rep combination. Strictly speaking it does this by taking the average of all the tech rep for a sample and bio-rep because if there is only one tech rep we get that one value, if there is more than one we get the average of them as expected
+
+```{r}
+library(rlang)
+
+combine_tech_reps <- function(df){
+  df %>%
+    dplyr::group_by(.data$gene_id, .data$peptide, .data$treatment, .data$seconds, .data$bio_rep) %>%
+    dplyr::summarize(mean_tr_quant = mean(.data$quant, na.rm = TRUE) )
+}
+
+
+matrix_data <- function(df){
+  df <- combine_tech_reps(df)
+  row_info <- dplyr::group_by(df, .data$gene_id, .data$peptide, .data$treatment, .data$seconds, .data$bio_rep) %>%
+    dplyr::summarize(col_count = dplyr::n() )
+
+  dm <- df %>%
+    tidyr::pivot_wider(names_from = c(.data$treatment, .data$seconds, .data$bio_rep), values_from = .data$mean_tr_quant) %>%
+    as.matrix()
+
+  row_info <- dm[,c("gene_id", "peptide")]
+  col_info <- colnames(dm[,3:length(colnames(dm))])
+  dm <-  matrix(as.numeric(dm[,3:ncol(dm)]), nrow=nrow(dm) )
+  colnames(dm) <- col_info
+  return(list( row_info = row_info, data = dm ))
+}
+```
+
+
+So if we run this code we get a matrix of bio-rep level data for each sample. Note that rownames are consistent across the analysis but not always shown with the data, they are in a separate bit `row_info` shown below too but not _always_  
+
+```{r}
+mdata <- matrix_data(pdiff)
+mdata$data
+mdata$row_info
+
+```
+
+Which is a bit easier read if we plot as a heatmap, grey boxes are missing values.
+
+```{r, fig.width=10}
+m <- mdata$data
+rownames(m) <- mdata$row_info[,'peptide']
+colnames(m) <- colnames(mdata$data)
+ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+```
+
+## Replacing missing values
+
+Now we are at the stage for doing comparisons. We'll select a control and test (Spores (0) vs 1 hr in the genotype Guy11) and process that in the way done in the package. The first step is to find and replace the missing values with the lowest observed peptide values across the whole set. Working out the lowest values is  done with the function `min_peptide_values()`
+
+```{r}
+
+min_peptide_values <- function(d){
+  apply(d$data, MARGIN = 1, min, na.rm = TRUE)
+}
+
+lowest_vals <- min_peptide_values(mdata)
+
+```
+
+and selecting the columns is done with the function `select_columns_for_contrast()`
+
+```{r}
+select_columns_for_contrast <- function(l, treatment = NA,
+                                        t_seconds = NA,
+                                        control = NA,
+                                        c_seconds = NA){
+  td <- paste(treatment, t_seconds, sep = "_")
+  td <- paste0("^", td, "$")
+
+  cd <- paste(control, c_seconds, sep = "_")
+  cd <- paste0("^", cd, "$")
+  cnames_no_biorep <- unlist(lapply(strsplit(colnames(l$data), "_"), function(x) paste0(x[1], "_", x[2])))
+
+  t_ind <- which(stringr::str_detect(cnames_no_biorep, td))
+  c_ind <- which(stringr::str_detect(cnames_no_biorep, cd))
+
+  return(list(
+    treatment = l$data[,t_ind],
+    control = l$data[,c_ind]
+  ))
+}
+
+
+  selected_cols <- select_columns_for_contrast(
+    mdata,
+    treatment = "Guy11",
+    t_seconds = 1,
+    control = "Guy11",
+    c_seconds = 0
+  )
+
+
+selected_cols
+
+```
+
+Lets quickly plot that as a heatmap
+
+```{r, fig.width=10}
+m <- cbind(selected_cols$control, selected_cols$treatment)
+rownames(m) <- mdata$row_info[,'peptide']
+hm_missing <- ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+hm_missing
+```
+
+
+
+And replacing the missing values is done like this 
+
+```{r}
+replace_vals <- function(x, lowest_vals){
+  to_replace <- which(is.na(x))
+  x[to_replace] <- lowest_vals[to_replace]
+  return(x)
+}
+
+control <- apply(selected_cols$control, MARGIN = 2, replace_vals, lowest_vals)
+treatment <- apply(selected_cols$treatment, MARGIN = 2, replace_vals, lowest_vals)
+  
+control
+treatment
+```
+
+And a heatmap for the replaced values
+
+```{r, fig.width=10}
+m <- cbind(control, treatment)
+rownames(m) <- mdata$row_info[,'peptide']
+hm_replaced <- ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+hm_replaced
+
+```
+
+and side-by-side with the unreplaced for ease
+
+```{r, fig.width = 14, out.width="50%", fig.show="hold", fig.height=7}
+hm_missing
+hm_replaced
+```
+
+
+All these replacements look sane to me. 
+
+
+### Output data to excel files for ease
+
+Here I just dump my data objects to an Excel file.
+
+```{r}
+library(writexl)
+
+#cleaned_small
+#pdiff
+
+all_mat_dat <- as.data.frame(cbind(mdata$row_info, mdata$data))
+sel_cols_missing <- as.data.frame(cbind(mdata$row_info, selected_cols$control, selected_cols$treatment))
+sel_cols_replaced <- as.data.frame(m <- cbind(mdata$row_info, control, treatment))
+
+x <- list(
+  cleaned_small = cleaned_small,
+  loaded_into_pepdiff = pdiff,
+  as_matrix_techreps_merged = all_mat_dat,
+  selected_cols_missing_values = sel_cols_missing,
+  selected_cols_replaced_values = sel_cols_replaced
+)
+
+write_xlsx(x, here::here("cleaned","004_all_tables.xlsx"))
+```
+
+
+
+
+
+
+
+

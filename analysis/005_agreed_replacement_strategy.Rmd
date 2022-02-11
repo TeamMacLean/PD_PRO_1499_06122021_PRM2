@@ -1,0 +1,277 @@
+---
+title: "004_troubleshooting.Rmd"
+author: "Dan MacLean"
+date: "18/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+knitr::opts_chunk$set(echo = TRUE)
+library(circlize)
+col_fun = colorRamp2(c(0, 0.0014), c( "white", "blue"))
+col_fun(seq(0, 10))
+
+
+```
+
+We've agreed to try the original replacement strategy as discussed in the ticket `https://thesainsburylab.freshdesk.com/a/tickets/1499` . Paul has sent a corrected input data set that we should work on. This analysis will follow the replacement strategy we agreed on (in fact the original one) in detail and then do the ratio calculations and bootstrap. The hope is that the corrected sheet will remove some of the anomalies. 
+
+
+## Load corrected data from Paul
+
+First step is to load the newer corrected data that Paul provided, specifically the new file `M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_2.xlsx`
+
+and the sheet `Data_for_informatics (2)`, note that Paul has, without warning, changed his naming scheme so this needs slightly different code to previously.
+
+```{r}
+xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_2.xlsx")
+readxl::excel_sheets(xlp)
+
+xld <- readxl::read_excel(xlp, sheet="Data_for_informatics (2)")
+xld 
+
+```
+
+
+### 'Tidy' the data
+
+Next step is to move the data from the current format into the 'tidy' format needed for any analysis
+
+```{r}
+
+cleaned <- xld %>% 
+  dplyr::select( `Replicate Name`, `Molecule List Name`, `Total Area`, `Peptide Modified Sequence`) %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>% 
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep", "tech_rep", "misc"), sep="_") %>%
+  dplyr::mutate(
+    timepoint = as.numeric(dplyr::if_else(timepoint == 'Spores', "0", timepoint)),
+    bio_rep = as.numeric(stringr::str_sub(bio_rep, 2,-1)),
+    tech_rep = as.numeric(stringr::str_sub(tech_rep, 2,-1))
+  ) %>% 
+  dplyr::select(molecule_list_name, peptide_modified_sequence, genotype, timepoint, bio_rep, tech_rep, total_area)
+
+cleaned
+```
+
+The data is large, so for this close walkthrough, I'll use a smaller subset. Previously we used the peptides  `"AAEEDVTTT[+80]PR"` which has sparse information,  `"KLS[+80]ASGS[+80]PGSVNLGR"` which has better information, `"QTRT[+80]PS[+80]PASNGPAPLGVAEGPITPR"` which has full information, and `"RLS[+80]FGDDQEER"` which is of interest from Paul's PPT, as is `VTS1` `"SNDNSGQNPLS[+80]PGM[+16]ISPNVVM[+16]VDEHGR"`. So I'll pull these out and use them.
+
+```{r}
+keepers <- c("AAEEDVTTT[+80]PR","KLS[+80]ASGS[+80]PGSVNLGR","QTRT[+80]PS[+80]PASNGPAPLGVAEGPITPR",
+             "RLS[+80]FGDDQEER", "SNDNSGQNPLS[+80]PGM[+16]ISPNVVM[+16]VDEHGR")
+
+cleaned_small <- dplyr::filter(cleaned, peptide_modified_sequence %in% keepers)
+dplyr::arrange(cleaned_small, desc(total_area) )
+readr::write_csv(cleaned_small, here::here("cleaned", "005_selected_ts_1.csv")) %>% dplyr::select(total_area)
+```
+
+## Use test data set through whole pipeline
+
+Following the format of the previous trouble shoot `004_troubleshooting.Rmd`, I'll step through the replacement steps
+
+
+### Load into `pepdiff` data stucture
+
+```{r,eval=TRUE}
+library(pepdiff)
+pdiff <- import_data(here::here("cleaned", "005_selected_ts_1.csv"),
+                 gene_id = "molecule_list_name", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+pdiff
+```
+
+
+This is where we would normally start from. The code below is discussed in the previous document, so here it just runs and shows a heatmap of biorep level data with combined tech rep info
+
+```{r,eval=TRUE, fig.width=10}
+library(rlang)
+
+combine_tech_reps <- function(df){
+  df %>%
+    dplyr::group_by(.data$gene_id, .data$peptide, .data$treatment, .data$seconds, .data$bio_rep) %>%
+    dplyr::summarize(mean_tr_quant = mean(.data$quant, na.rm = TRUE) )
+}
+
+
+matrix_data <- function(df){
+  df <- combine_tech_reps(df)
+  row_info <- dplyr::group_by(df, .data$gene_id, .data$peptide, .data$treatment, .data$seconds, .data$bio_rep) %>%
+    dplyr::summarize(col_count = dplyr::n() )
+
+  dm <- df %>%
+    tidyr::pivot_wider(names_from = c(.data$treatment, .data$seconds, .data$bio_rep), values_from = .data$mean_tr_quant) %>%
+    as.matrix()
+
+  row_info <- dm[,c("gene_id", "peptide")]
+  col_info <- colnames(dm[,3:length(colnames(dm))])
+  dm <-  matrix(as.numeric(dm[,3:ncol(dm)]), nrow=nrow(dm) )
+  colnames(dm) <- col_info
+  return(list( row_info = row_info, data = dm ))
+}
+
+mdata <- matrix_data(pdiff)
+mdata$data
+mdata$row_info
+
+m <- mdata$data
+rownames(m) <- mdata$row_info[,'peptide']
+colnames(m) <- colnames(mdata$data)
+ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+```
+
+## Replacing missing values
+
+Now we are at the stage for doing comparisons. As before select a control and test (Spores (0) vs 1 hr in the genotype Guy11) and process that in the way done in the package and as discussed in the earlier document, this is the same code and the heatmap produced is the replaced value one.
+
+```{r, eval=TRUE}
+
+min_peptide_values <- function(d){
+  apply(d$data, MARGIN = 1, min, na.rm = TRUE)
+}
+
+lowest_vals <- min_peptide_values(mdata)
+
+
+select_columns_for_contrast <- function(l, treatment = NA,
+                                        t_seconds = NA,
+                                        control = NA,
+                                        c_seconds = NA){
+  td <- paste(treatment, t_seconds, sep = "_")
+  td <- paste0("^", td, "$")
+
+  cd <- paste(control, c_seconds, sep = "_")
+  cd <- paste0("^", cd, "$")
+  cnames_no_biorep <- unlist(lapply(strsplit(colnames(l$data), "_"), function(x) paste0(x[1], "_", x[2])))
+
+  t_ind <- which(stringr::str_detect(cnames_no_biorep, td))
+  c_ind <- which(stringr::str_detect(cnames_no_biorep, cd))
+
+  return(list(
+    treatment = l$data[,t_ind],
+    control = l$data[,c_ind]
+  ))
+}
+
+
+  selected_cols <- select_columns_for_contrast(
+    mdata,
+    treatment = "Guy11",
+    t_seconds = 1,
+    control = "Guy11",
+    c_seconds = 0
+  )
+
+
+selected_cols
+
+m <- cbind(selected_cols$control, selected_cols$treatment)
+rownames(m) <- mdata$row_info[,'peptide']
+hm_missing <- ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+hm_missing
+
+replace_vals <- function(x, lowest_vals){
+  to_replace <- which(is.na(x))
+  x[to_replace] <- lowest_vals[to_replace]
+  return(x)
+}
+
+control <- apply(selected_cols$control, MARGIN = 2, replace_vals, lowest_vals)
+treatment <- apply(selected_cols$treatment, MARGIN = 2, replace_vals, lowest_vals)
+  
+control
+treatment
+
+m <- cbind(control, treatment)
+rownames(m) <- mdata$row_info[,'peptide']
+hm_replaced <- ComplexHeatmap::Heatmap(m, column_order = colnames(m), row_order = rownames(m), rect_gp = grid::gpar(col = "white", lwd = 2 ), col = col_fun )
+hm_replaced
+
+```
+
+and side-by-side with the unreplaced for ease
+
+```{r, fig.width = 14, out.width="50%", fig.show="hold", fig.height=7,eval=TRUE}
+hm_missing
+hm_replaced
+```
+
+The replacments look fine, so we move onto doing the ratio and bootstrap calculations as per the package.
+
+```{r}
+get_bootstrap_percentile <- function(treatment, control, iters=10000){
+
+
+  peptide_count <- dim(control)[1]
+  result <- rep(NA, peptide_count)
+  for (i in 1:peptide_count){
+    result[i] <- tryCatch(
+      {MKinfer::boot.t.test(treatment[i,], control[i,], R = iters)$p.value},
+      warning = function(w){ return(NA) },
+      error = function(e){
+        return( NA )
+      },
+      finally = {})
+
+  }
+  return(data.frame(bootstrap_t_p_val = result, bootstrap_t_fdr = stats::p.adjust(result, method = 'bonferroni')))
+}
+
+mean_fold_change <- function(treatment, control){
+
+  rowMeans(treatment, na.rm = TRUE) / rowMeans(control, na.rm = TRUE)
+
+}
+options(scipen=999)
+r <- list(
+  peptide = rownames(m),
+  selected_cols = data.frame(control = control, treatment = treatment),
+  treatment_mean_count = rowMeans(treatment, na.rm = TRUE),
+  control_mean_count = rowMeans(control, na.rm = TRUE),
+    fc = mean_fold_change(treatment, control),
+  log_fc = log(mean_fold_change(treatment, control), 2),
+  r_bootstrap_t = get_bootstrap_percentile(treatment, control, 10000)
+)
+
+results <- tibble::tibble(dplyr::bind_cols(r))
+rmarkdown::paged_table(results)
+```
+
+The table can be scrolled through left to right, we can see that the values appear to be computed correctly and make sense. 
+
+
+### Output data to excel files for ease
+
+Here I just dump my data objects to an Excel file.
+
+```{r, eval=TRUE}
+library(writexl)
+
+#cleaned_small
+#pdiff
+
+all_mat_dat <- as.data.frame(cbind(mdata$row_info, mdata$data))
+sel_cols_missing <- as.data.frame(cbind(mdata$row_info, selected_cols$control, selected_cols$treatment))
+sel_cols_replaced <- as.data.frame(m <- cbind(mdata$row_info, control, treatment))
+
+x <- list(
+  cleaned_small = cleaned_small,
+  loaded_into_pepdiff = pdiff,
+  as_matrix_techreps_merged = all_mat_dat,
+  selected_cols_missing_values = sel_cols_missing,
+  selected_cols_replaced_values = sel_cols_replaced,
+  results = results
+)
+
+write_xlsx(x, here::here("cleaned","005_all_tables.xlsx"))
+```
+
+
+
+
+
+
+
+
