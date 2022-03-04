@@ -162,6 +162,7 @@ The plot has a reasonable elbow, the line starts to show diminishing improvement
 The following plot shows the centre value of each cluster.
 
 ```{r}
+set.seed(1044)
 kmeans_clust <- kmeans(sig_fc_mat, 10, nstart = 25, iter.max=1000)
 str(kmeans_clust)
 kmean_summ <- ComplexHeatmap::Heatmap(kmeans_clust$centers,column_order = col_order, row_order = 1:10,
@@ -217,4 +218,44 @@ for (i in 1:max(kmeans_clust$cluster)){
 ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
 
 ```
+
+## Inadvisable 'post-hoc' cluster determination by eye and rework into clustering
+
+Latterly, Frank has requested that I try 15 clusters based on an observation that the cluster 5 has some obvious sub-clusters in it. I do not think that this is a wise approach. Simply increasing the cluster number will not necessarily break only that cluster and rather it will break all proteins into different clusters. So it probably won't work (it might, though). Each cluster is a unit of minimal variance given the number of clusters. Increasing the number of clusters will just mean that the proteins have to be shared out differently. Each of the existing clusters minimises the variability over the entire dataset, no cluster is guaranteed to be minimal in and of itself so each could easily break when you try to re-do it with different parameters.
+
+Also there's no rational evidence in the idea of there being 15 clusters really in the data. We saw that 15 clusters doesn't reduce the overall variability very much (the point of inflection is closer to 10). The only reason we have to split the clusters up is that Frank 'believes' that there are sub clusters. Data says there isn't. It's okay for Frank to think this and do it post hoc but we can't justify it in the k-means approach. Really Frank is worried about explaining this to reviewers who don't understand the method, so the correct approach is to educate the reviewers about the method. Explicitly manually dividing the clusters and explaining that you did that is legit, you just have to be brave enough to do it, you can't misuse a method in a non-objective way and then hide behind the method as an objective way of splitting the clusters. When you're being non-objectibe and 'expert-led' then just say. 
+
+Nonetheless, here is 15 clusters
+
+```{r}
+set.seed(1044)
+kmeans_clust_15 <- kmeans(sig_fc_mat, 15, nstart = 25, iter.max=1000)
+kmean_summ_15 <- ComplexHeatmap::Heatmap(kmeans_clust_15$centers,column_order = col_order, row_order = 1:15,
+                        col = circlize::colorRamp2(
+                          seq(ll,ul, length.out = 11),
+                          rev(RColorBrewer::brewer.pal(11, "RdBu")),
+                        ),
+                        show_heatmap_legend = FALSE,)
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(ll, ul, length.out = 11),
+                           rev(RColorBrewer::brewer.pal(11, "RdBu"))
+                         ),
+  title = "Log 2 Fold Change")
+
+ComplexHeatmap::draw(kmean_summ_15,padding= grid::unit(c(0,0,0,1.5), "in"))
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+
+hml <- make_hmap(sig_fc_mat, kmeans_clust_15, col_order)
+
+
+for (i in 1:max(kmeans_clust_15$cluster)){
+  ComplexHeatmap::draw(hml[[i]],padding= grid::unit(c(0,0,0,1.5), "in"))
+}
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+```
+
+Hope it works!
 
