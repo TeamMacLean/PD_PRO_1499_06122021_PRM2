@@ -1,0 +1,277 @@
+---
+title: "008 Heatmap Recoloured"
+author: "Dan MacLean"
+date: "03/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Heatmap on whole data set, but recoloured
+
+Frank would like the same analysis as in doc `007_heatmap.Rmd` but in the `viridis` or similar colour scheme that was used in some other analysis to be in the same paper.  This document is therefore a complete copy of that with only the palette switched.
+
+Ostensibly `viridis` is preferred because the red/blue previously used had a red component that 'could not be seen by some people' ?! The RdBu palette is also colour-blind safe and perceptually uniform so could be used and will remain the default in the package. To satisfy the request I tried interpolating the blue and green shades in `viridis` as well as the purple and yellow, but the nature of the data meant that the overall effect was green, which didn't reach the goal of unifying the colour scheme at all and fails the aesthetic goal of the re-analysis (!lolz!). I used only purple (high) and yellow (low) in this redoing. 
+
+
+```{r, fig.height=20, fig.width=10}
+load(here::here("analysis", "many.rda"))
+
+
+all_fc_vals <- log2(dplyr::bind_rows(lapply(many, function(x){dplyr::select(x, fold_change) }))$fold_change)
+max_fc <- max(all_fc_vals)
+min_fc <- min(all_fc_vals)
+
+ul <- max(abs(c(max_fc, min_fc)))
+ll <- ul * -1
+
+library(pepdiff)
+
+ht <- plot_heatmap(many, metric = "bootstrap_t_fdr", log = TRUE, sig_only = FALSE, padding = c(0.5,0.5,0.5,4) ,lgd_x = 8, lgd_y=1, pal="RdBu" )
+
+
+
+```
+
+```{r,fig.height=36, fig.width=10}
+
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(ll, ul, length.out = 11),
+                           rev(RColorBrewer::brewer.pal(11, "RdBu"))
+                         ),
+  title = "Log 2 Fold Change")
+
+#ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
+#ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
+```
+
+Looks much better! Let's try with a filter on the sig value. I'll hand roll the code to cross check for problems.
+
+```{r,fig.height = 40, fig.width=24}
+
+##extract the fc columns from the list of dfs
+fc_mats <- lapply(many, function(x){
+  srted <- dplyr::mutate(x, 
+                gene_peptide = gene_id,
+                log_fc = log2(fold_change)
+                ) %>%
+    dplyr::arrange(gene_peptide) %>%  ##crucial to sort rows to be in same order for later steps
+    dplyr::select(gene_peptide, log_fc) 
+  rname <- srted$gene_peptide
+  srted$gene_peptide <- NULL
+  srted_m <- as.matrix(srted)
+  rownames(srted_m) <- rname
+  return(srted_m)
+})
+
+##join the columns into a matrix
+fc_m <- do.call(cbind, fc_mats)
+colnames(fc_m) <- names(fc_mats)
+
+##extract the sig columns from the list of dfs
+sig_mats <- lapply(many, function(x){
+  srted <- dplyr::mutate(x, 
+                gene_peptide = paste(gene_id, peptide, sep=" "),
+                ) %>%
+    dplyr::arrange(gene_peptide) %>% 
+    dplyr::select(gene_peptide, bootstrap_t_p_val) 
+  rname <- srted$gene_peptide
+  srted$gene_peptide <- NULL
+  srted_m <- as.matrix(srted)
+  rownames(srted_m) <- rname
+  return(srted_m)
+})
+
+##join the columns into a matrix
+sig_m <- do.call(cbind, sig_mats)
+colnames(sig_m) <- names(sig_mats)
+
+## work out if any rows (peptides) have any sig values <= 0.05 )
+sig_rows <- apply(sig_m, 1, function(x) {any(x <= 0.05 )})
+
+## deal with NAs from uncomplete bootstraps
+sig_rows[is.na(sig_rows)] <- FALSE
+
+## select only fc valeues for passing peptides
+sig_fc_mat <- fc_m[sig_rows,]
+
+
+## get upper and lower limits
+max_fc <- max(sig_fc_mat)
+min_fc <- min(sig_fc_mat)
+
+ul <- max(abs(c(max_fc, min_fc)))
+ll <- ul * -1
+
+
+##define the custom colour scheme
+
+pal <- colorRampPalette(
+  c(
+    rgb(68/255, 1/255, 84/255, 1.00),
+    #rgb(94/255, 201/255, 98/255),
+    "white",
+    #rgb(59/255, 82/255, 139/255)
+    rgb(253/255, 231/255, 37/255, 1.00)
+    )
+)
+colours <-  pal(11)
+
+## draw! 
+col_order <- names(sig_fc_mat)
+new_ht <- ComplexHeatmap::Heatmap(sig_fc_mat, column_order = col_order,
+                        col = circlize::colorRamp2(
+                          seq(ll,ul, length.out = 11),
+                          rev(pal(11)),
+                        ),
+                        show_heatmap_legend = FALSE,
+                        #width=grid::unit(4, "in")
+                        column_names_gp = grid::gpar(fontsize=24, fontface="bold"),
+                        row_names_gp = grid::gpar(fontsize=15, fontface="bold")
+                        )
+
+
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(ll, ul, length.out = 11),
+                           rev(pal(11))
+                         ),
+  legend_width = grid::unit(3, "in"),
+  labels_gp =  grid::gpar(fontsize = 24, fontface = "bold"),
+  title_gp = grid::gpar(fontsize = 24, fontface = "bold"),
+  title = "Log 2 Fold Change")
+
+
+ComplexHeatmap::draw(new_ht,
+                     row_dend_width=grid::unit(3,"in"),
+                     height=grid::unit(36, "in"),
+                     legend_grid_height = grid::unit(2, "in"),
+                     padding= grid::unit(c(0,0,0,3), "in"))
+ComplexHeatmap::draw(lgd, x = grid::unit(1.7, "in"), y = grid::unit(1, "in"))
+
+
+```
+
+
+Great, after a lot of fiddling with graphics parameters, it doesn't look too bad. It can't be easily plot on A4 though! Paul also wants to use the heatmap to infer clusters of co-regulated peptides. That is a bit of a sloppy approach, so I'll build a cluster analysis.
+
+
+## Estimating cluster counts
+
+Work out the number of clusters in the data set of peptides with at least on significant peptide.
+
+```{r}
+library(factoextra)
+
+fviz_nbclust(sig_fc_mat, kmeans, method="wss", k.max = 50)
+
+```
+
+The plot has a reasonable elbow, the line starts to show diminishing improvement at around 10 clusters, and that's a manageable number, so lets divide into the ten best clusters. 
+
+
+## Summarising the clusters
+
+The following plot shows the centre value of each cluster.
+
+```{r}
+set.seed(1044)
+kmeans_clust <- kmeans(sig_fc_mat, 10, nstart = 25, iter.max=1000)
+str(kmeans_clust)
+kmean_summ <- ComplexHeatmap::Heatmap(kmeans_clust$centers,column_order = col_order, row_order = 1:10,
+                        col = circlize::colorRamp2(
+                          seq(ll,ul, length.out = 11),
+                           rev(pal(11)),
+                        ),
+                        show_heatmap_legend = FALSE,)
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(ll, ul, length.out = 11),
+                            rev(pal(11))
+                         ),
+  title = "Log 2 Fold Change")
+
+ComplexHeatmap::draw(kmean_summ,padding= grid::unit(c(0,0,0,1.5), "in"))
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+```
+
+## Plot a heatmap of each cluster
+
+Clusters are in numeric order. A common legend is output at the end. 
+
+```{r, fig.height=9}
+make_hmap <- function(mat, km, col_order) {
+  r <- list(vector(mode = "list", length = max(km$cluster)))
+  for (i in 1:max(km$cluster)){
+    rnames <- names(km$cluster[km$cluster == i])
+    m <- mat[rnames,]
+    if (length(rnames) == 1){
+      m <- t(as.matrix(m))
+      rownames(m) <- rnames
+    }
+    r[i] <- ComplexHeatmap::Heatmap(m,column_order = col_order, name = paste("Cluster", i),
+                        col = circlize::colorRamp2(
+                          seq(ll,ul, length.out = 11),
+                           rev(pal(11)),
+                        ),
+                        height = length(rnames)*grid::unit(5, "mm"),
+                        show_heatmap_legend = FALSE,)
+    
+  }
+ return(r) 
+}
+
+hml <- make_hmap(sig_fc_mat, kmeans_clust, col_order)
+
+
+for (i in 1:max(kmeans_clust$cluster)){
+  ComplexHeatmap::draw(hml[[i]],padding= grid::unit(c(0,0,0,1.5), "in"))
+}
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+```
+
+## Inadvisable 'post-hoc' cluster determination by eye and rework into clustering
+
+Latterly, Frank has requested that I try 15 clusters based on an observation that the cluster 5 has some obvious sub-clusters in it. I do not think that this is a wise approach. Simply increasing the cluster number will not necessarily break only that cluster and rather it will break all proteins into different clusters. So it probably won't work (it might, though). Each cluster is a unit of minimal variance given the number of clusters. Increasing the number of clusters will just mean that the proteins have to be shared out differently. Each of the existing clusters minimises the variability over the entire dataset, no cluster is guaranteed to be minimal in and of itself so each could easily break when you try to re-do it with different parameters.
+
+Also there's no rational evidence in the idea of there being 15 clusters really in the data. We saw that 15 clusters doesn't reduce the overall variability very much (the point of inflection is closer to 10). The only reason we have to split the clusters up is that Frank 'believes' that there are sub clusters. Data says there isn't. It's okay for Frank to think this and do it post hoc but we can't justify it in the k-means approach. Really Frank is worried about explaining this to reviewers who don't understand the method, so the correct approach is to educate the reviewers about the method. Explicitly manually dividing the clusters and explaining that you did that is legit, you just have to be brave enough to do it, you can't misuse a method in a non-objective way and then hide behind the method as an objective way of splitting the clusters. When you're being non-objectibe and 'expert-led' then just say. 
+
+Nonetheless, here is 15 clusters
+
+```{r}
+set.seed(1044)
+kmeans_clust_15 <- kmeans(sig_fc_mat, 15, nstart = 25, iter.max=1000)
+kmean_summ_15 <- ComplexHeatmap::Heatmap(kmeans_clust_15$centers,column_order = col_order, row_order = 1:15,
+                        col = circlize::colorRamp2(
+                          seq(ll,ul, length.out = 11),
+                           rev(pal(11))
+                        ),
+                        show_heatmap_legend = FALSE,)
+lgd <- ComplexHeatmap::Legend(direction = "horizontal",
+  col_fun = circlize::colorRamp2(
+                           seq(ll, ul, length.out = 11),
+                            rev(pal(11))
+                         ),
+  title = "Log 2 Fold Change")
+
+ComplexHeatmap::draw(kmean_summ_15,padding= grid::unit(c(0,0,0,1.5), "in"))
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+
+hml <- make_hmap(sig_fc_mat, kmeans_clust_15, col_order)
+
+
+for (i in 1:max(kmeans_clust_15$cluster)){
+  ComplexHeatmap::draw(hml[[i]],padding= grid::unit(c(0,0,0,1.5), "in"))
+}
+ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
+
+```
+
+Hope it works!
+

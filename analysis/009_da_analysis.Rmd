@@ -1,0 +1,74 @@
+---
+title: "009 Bootstrap Analysis"
+author: "Dan MacLean"
+date: "03/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(magrittr)
+knitr::opts_chunk$set(echo = TRUE)
+library(circlize)
+col_fun = colorRamp2(c(0, 0.0014), c( "white", "blue"))
+col_fun(seq(0, 10))
+```
+
+## Bootstrap Analysis on whole data set by between genotype.
+
+Frank would like a between genotype analysis with volcano plots. 
+
+```{r}
+xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_2.xlsx")
+readxl::excel_sheets(xlp)
+
+xld <- readxl::read_excel(xlp, sheet="Data_for_informatics (2)")
+
+```
+
+
+### 'Tidy' the data
+
+Next step is to move the data from the current format into the 'tidy' format needed for any analysis, this was already done in `006_da_analysis.Rmd` so we can use the cleaned file from that. 
+
+## Load the data into `pepdiff`
+
+```{r,eval=TRUE}
+library(pepdiff)
+pdiff <- import_data(here::here("cleaned", "006_cleaned.csv"),
+                 gene_id = "gene_id", 
+                 treatment = "genotype", 
+                 peptide = "peptide_modified_sequence", 
+                 seconds = "timepoint")
+pdiff
+```
+
+
+Looks good. Now we can do the bootstrap analysis
+
+
+```{r, eval=TRUE}
+comparisons <- data.frame(
+  control = c(rep("Guy11", 5)),
+  c_seconds = c(1,1.5,2,4,6),
+  treatment = c( rep("dpmk1", 5)),
+  t_seconds =c(1,1.5,2,4,6)
+)
+
+many_between <- compare_many(pdiff, comparisons, tests = c("bootstrap_t"), iters=10000)
+```
+
+
+
+Now a quick look at the volcano plots for all the comparisons.
+
+```{r, eval=TRUE, fig.width=10, fig.height=10}
+volcano_plot(many_between, metric = "bootstrap_t")
+```
+
+
+
+```{r, eval=TRUE}
+writexl::write_xlsx(many_between, here::here("analysis","009_differential_abundance_Guy110-dpmk1_between_geno_estimates.xlsx"))
+save(many_between, file=here::here("analysis","many_between.rda"))
+```
+
