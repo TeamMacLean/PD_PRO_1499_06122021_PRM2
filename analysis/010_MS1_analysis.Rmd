@@ -1,0 +1,303 @@
+---
+title: "010_MS1_analysis"
+author: "Dan MacLean"
+date: "2022-10-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+Frank would like a heatmap of some MS1 data, clustered on `Guy11` samples only and scaled by row in the range 0 - 1.
+
+
+## Load and clean the data
+```{r}
+library(readxl)
+library(here)
+library(dplyr)
+library(tidyr)
+library(readr)
+
+file <- here("raw/Nrc210121_rgm2r.xlsx" )
+
+
+cleaned <- read_excel(file, sheet=excel_sheets(file)) |> 
+  select(`Positions in Master Proteins`, `Modifications`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`), names_to = "sample") |> 
+  mutate(
+    sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
+  ) |> 
+  separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
+  distinct()
+  
+write_csv(cleaned, here("cleaned/ms1_cleaned.csv"))
+
+```
+
+## Build the matrix
+
+The long dataframe needs pivot-ing into a matrix. Scaling is applied too. 
+
+```{r}
+
+m <- cleaned |>
+  mutate(sample_time = paste(sample, time, sep="-"),
+         id = paste(`Positions in Master Proteins`, `Modifications`, sep="-")
+         ) |> 
+  select(id, sample_time, value) |> 
+  pivot_wider(names_from = "sample_time", values_from = "value" )
+
+rows <- m$id
+m$id <- NULL
+raw_m <- as.matrix(m)
+
+## Now scale
+m <- t(apply(raw_m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
+
+```
+
+## General hc cluster on `Guy11` columns only
+
+
+### Replace NAs in `dist` calculation
+
+The data are a little sparse, Frank has filtered to ensure there are always at least five measurements out of 12. This is sensible but the distance measure for clustering can't be computed unless there are at least two overlapping values in the pairs of proteins (row data) being compared (meaning I think that this threshold should be 8). For now I get round this by replacing the NA for pairs without two overlapping values with the maximum distance in the whole distance matrix About 92000 pairs of 36million are affected. 
+
+The cluster is plotted briefly. 
+
+
+```{r,fig.width=15}
+
+guy11 <- c('Guy11-0', 'Guy11-1', 'Guy11-1.5', 'Guy11-2', 'Guy11-4', 'Guy11-6')
+dpmk <- c('dpmk1-0', 'dpmk1-1', 'dpmk1-1.5', 'dpmk1-2', 'dpmk1-4','dpmk1-6')
+#just do the guy11
+gm <- m[,guy11]
+d <- dist(gm)
+d[which(is.na(d))] <- max(d, na.rm = TRUE)
+hc <- hclust(d)
+
+row_order <- hc$order
+
+plot(hc)
+```
+
+#### Draw heatmap
+
+The heatmap is drawn with this ordering. Note the grey NA values not mentioned in the scale
+
+
+```{r, fig.height=15,eval=TRUE}
+pal <- viridis::viridis_pal()
+colours <-  pal(11)
+
+
+## draw! 
+  
+  ComplexHeatmap::Heatmap(m, column_order = c(guy11, dpmk), 
+                          row_order = row_order,
+                        col = colours,
+                        use_raster=FALSE,
+                        heatmap_legend_param = list(title = "Scaled Abundance")
+
+                        )
+
+
+
+```
+
+
+
+### Replace NAs with minimal data value
+
+We can also replace NA with the minimum observed value on the whole abundance data - before scaling and distance measuring (don't know whether this is legit this time - Frank can illuminate) 
+
+
+
+
+```{r}
+m <- raw_m
+m[is.na(m)] <- min(m, na.rm=TRUE)
+## Now scale
+m <- t(apply(m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
+```
+
+Now cluster 
+
+```{r,fig.width=15}
+#just do the guy11
+gm <- m[,guy11]
+d <- dist(gm)
+hc <- hclust(d)
+
+row_order <- hc$order
+
+plot(hc)
+```
+
+#### Draw heatmap
+
+The heatmap is drawn with this ordering
+
+
+```{r, fig.height=15,eval=TRUE}
+pal <- viridis::viridis_pal()
+colours <-  pal(11)
+
+
+## draw! 
+  
+  ComplexHeatmap::Heatmap(m, column_order = c(guy11, dpmk), 
+                          row_order = row_order,
+                        col = colours,
+                        use_raster=FALSE,
+                        heatmap_legend_param = list(title = "Scaled Abundance")
+
+                        )
+
+
+
+```
+
+
+## k-means on whole clustered by Guy11
+
+Frank would like to `kmeans` cluster the matrix. First by `Guy11`. We can do this with the data of replacements of the missing values with the minimal observed values (not the replacements of the distances with the maximum distance) 
+
+
+```{r, eval=TRUE, cache=TRUE}
+library(factoextra)
+fviz_nbclust(gm, kmeans, method="wss", k.max = 50)
+```
+
+I'm going to go with 5 clusters, because the drop off after that is slight. Though its not super clear.
+
+
+### Summarising the clusters
+
+Can't easily add in the `dpmk1` stuff for the summary.. 
+
+```{r}
+set.seed(1044)
+kmeans_clust <- kmeans(gm, 5, nstart = 25, iter.max=1000)
+ComplexHeatmap::Heatmap(kmeans_clust$centers,column_order = guy11, row_order = 1:5,
+                        col = colours,
+                        use_raster=FALSE,
+                        heatmap_legend_param = list(title = "Scaled Abundance") 
+)
+
+```
+
+
+### Plot heatmap of `Guy11` kmeans clustered `Guy11` and `dpmk1` data
+
+
+```{r, eval=TRUE}
+make_hmap <- function(mat, km, col_order, colours) {
+  r <- list(vector(mode = "list", length = max(km$cluster)))
+  for (i in 1:max(km$cluster)){
+    rnames <- which(km$cluster == i)
+    tm <- mat[rnames,]
+    if (length(rnames) == 1){
+      tm <- t(as.matrix(tm))
+      rownames(tm) <- rnames
+    }
+
+    r[[i]] <- ComplexHeatmap::Heatmap(tm,column_order = col_order, name = paste("Cluster", i),
+                        col = colours,
+                        use_raster=FALSE,
+                        heatmap_legend_param = list(title = "Scaled Abundance") )
+    
+  }
+  return(r)
+}
+
+hml <- make_hmap(m, kmeans_clust, c(guy11, dpmk), colours)
+for (i in 1:max(kmeans_clust$cluster)){
+  ComplexHeatmap::draw(hml[[i]],padding= grid::unit(c(0,0,0,1.5), "in"))
+}
+```
+
+### Write to file
+
+```{r}
+make_csv <- function(mat,km,rows) {
+  for (i in 1:max(km$cluster)){
+    rnames <- which(km$cluster == i)
+    tm <- mat[rnames,]
+    if (length(rnames) == 1){
+      tm <- t(as.matrix(tm))
+      rownames(tm) <- rnames
+    }
+    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11.csv"))
+    df <- as.data.frame(tm)
+    df$id = rows[rnames]
+    write_csv(df, file)
+  }
+}
+make_csv(m, kmeans_clust,rows)
+```
+
+
+
+
+## kmeans on whole clustered by Guy11 and dpmk1
+
+Similar to above but allowing all matrix columns to be in the kmeans.
+
+```{r}
+library(factoextra)
+fviz_nbclust(m, kmeans, method="wss", k.max = 50)
+```
+
+Again, this seems to be about 5 clusters, but it is noisy. 
+
+
+### Summarising the clusters
+
+
+```{r}
+set.seed(1044)
+kmeans_clust <- kmeans(m, 5, nstart = 25, iter.max=1000)
+ComplexHeatmap::Heatmap(kmeans_clust$centers,column_order = c(guy11, dpmk), row_order = 1:5,
+                        col = colours,
+                        use_raster=FALSE,
+                        heatmap_legend_param = list(title = "Scaled Abundance") 
+)
+
+```
+
+### Plot heatmap of `Guy11` and `dpmk1` kmeans-clustered `Guy11` and `dpmk1` data
+
+
+```{r, eval=TRUE}
+hml <- make_hmap(m, kmeans_clust, c(guy11, dpmk), colours)
+for (i in 1:max(kmeans_clust$cluster)){
+  ComplexHeatmap::draw(hml[[i]],padding= grid::unit(c(0,0,0,1.5), "in"))
+}
+
+```
+
+
+### Write to file
+
+```{r}
+make_csv <- function(mat,km,rows) {
+  for (i in 1:max(km$cluster)){
+    rnames <- which(km$cluster == i)
+    tm <- mat[rnames,]
+    if (length(rnames) == 1){
+      tm <- t(as.matrix(tm))
+      rownames(tm) <- rnames
+    }
+    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11_and_dpmk1.csv"))
+    df <- as.data.frame(tm)
+    df$id = rows[rnames]
+    write_csv(df, file)
+  }
+}
+make_csv(m, kmeans_clust,rows)
+```
