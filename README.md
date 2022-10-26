@@ -21,5 +21,8 @@ Performed as described in the repo `.Rmd` using the tools previously developed i
  * 7-02-21
   Finalised replacement scheme and performed final da estimates. Performed k-means clustering analysis
   
+  * 26-10-22 [CJ]
+  GO enrichment analysis for each of the five clusters.
+  
 
     
