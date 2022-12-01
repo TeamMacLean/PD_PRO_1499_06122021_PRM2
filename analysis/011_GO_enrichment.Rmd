@@ -255,3 +255,75 @@ csv_filename = "011_cluster5_go_enrichment.csv"
 write_csv(enrich5_df, csv_filename)
 ```
 
+## Selected protein target
+
+### Load data
+
+Read data from csv file.
+
+
+```{r}
+targets = readxl::read_xlsx("Pmk1 direct targets PRM_101122.xlsx") %>% 
+  dplyr::select(`Phosphorylation position`) %>% unique()
+```
+
+Keep only the gene id (for now I remove gi number)
+Replacement:
+
+gi|145610929|ref|XP_368444.2| MST7  = MGG_00800
+gi|39964959|ref|XP_365053.1| MAC1 (S75) = MGG_09898
+
+
+```{r}
+targets2 = targets %>% 
+  dplyr::mutate(gene_ids = 
+      stringr::str_split(`Phosphorylation position`, " ", n = 2, simplify = TRUE)[,1]) %>%
+  dplyr::mutate(gene_ids = ifelse(`gene_ids` == 'gi|145610929|ref|XP_368444.2|', 
+    'MGG_00800', gene_ids)) %>%
+  dplyr::mutate(gene_ids = ifelse(`gene_ids` == 'gi|39964959|ref|XP_365053.1|', 
+    'MGG_09898', gene_ids))
+```
+
+In several cases, few selected peptides correspond to the same protein and thus the different lines/rows (peptides) are collapsed so that a single MGG number (gene/protein) is taken into consideration in the GO enrichment analysis resulting in a list of 31 proteins.
+
+```{r}
+gene_ids = targets2 %>% 
+  dplyr::mutate(gene_ids = stringr::str_split(`Phosphorylation position`, " ", n = 2, simplify = TRUE)[,1]) %>% 
+  dplyr::filter(str_detect(gene_ids, "^MGG")) %>% 
+  dplyr::select(gene_ids)  %>% 
+  unique()
+```
+
+### GO Enrichment
+
+```{r, message=FALSE}
+enrich_targets <- do_enrich(gene_ids$gene_ids)
+```
+
+
+```{r, message=FALSE}
+barplot(enrich_targets) + 
+  #scale_fill_viridis(direction = -1) + 
+  ggplot2::scale_fill_distiller(type = "seq", direction = -1, palette = 'Reds') +
+  ggplot2::theme(aspect.ratio = 1)
+```
+
+```{r, message=FALSE}
+# PRM-GO-dotplot.pdf
+dotplot(enrich_targets) + 
+  ggplot2::scale_colour_distiller(type = "seq", direction = -1, palette = 'Reds', limits = c(0, 0.005)) 
+
+# limits and directions are set so that the more intense the colour is, more smaller/better the p-value is
+```
+
+### Write results in CSV 
+
+```{r}
+enrich_targets_df = as.data.frame(enrich_targets) %>%
+  select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
+
+csv_filename = "011_targets_go_enrichment.csv"
+write_csv(enrich_targets_df, csv_filename)
+```
+
+

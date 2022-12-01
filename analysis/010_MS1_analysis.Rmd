@@ -62,7 +62,6 @@ m <- t(apply(raw_m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min
 
 ## General hc cluster on `Guy11` columns only
 
-
 ### Replace NAs in `dist` calculation
 
 The data are a little sparse, Frank has filtered to ensure there are always at least five measurements out of 12. This is sensible but the distance measure for clustering can't be computed unless there are at least two overlapping values in the pairs of proteins (row data) being compared (meaning I think that this threshold should be 8). For now I get round this by replacing the NA for pairs without two overlapping values with the maximum distance in the whole distance matrix About 92000 pairs of 36million are affected. 
@@ -162,7 +161,6 @@ colours <-  pal(11)
 
 ```
 
-
 ## k-means on whole clustered by Guy11
 
 Frank would like to `kmeans` cluster the matrix. First by `Guy11`. We can do this with the data of replacements of the missing values with the minimal observed values (not the replacements of the distances with the maximum distance) 
@@ -242,8 +240,6 @@ make_csv(m, kmeans_clust,rows)
 ```
 
 
-
-
 ## kmeans on whole clustered by Guy11 and dpmk1
 
 Similar to above but allowing all matrix columns to be in the kmeans.
@@ -300,4 +296,192 @@ make_csv <- function(mat,km,rows) {
   }
 }
 make_csv(m, kmeans_clust,rows)
+```
+
+
+# More heatmap visualisations
+
+CJ: Quick update on the heatmap as requested by Neftaly
+
+### General visual settings
+
+Colours
+
+```{r}
+pal <- viridis::viridis_pal()
+colours <-  pal(11)
+```
+
+Dendrogram for the row (proteins) clustering
+
+```{r}
+row_dend = as.dendrogram(hc)
+```
+
+Factor to set the order of the columns
+
+```{r}
+col_split = factor(stringr::str_split(colnames(m), "-", n = 2, simplify = TRUE)[,1], levels = c("Guy11", "dpmk1"))
+```
+
+Labels (times) for the columns
+
+```{r}
+col_labels = c('0h00', '0h00', 
+  '1h00', '1h00', '1h30', '1h30', 
+  '2h00', '2h00', '4h00', '4h00', 
+  '6h00', '6h00')
+```
+
+
+Factor to set the order of the clusters (according to Neftaly: 2,3,4,5,1):
+
+```{r}
+row_split = factor(kmeans_clust$cluster, levels=c("2","3","4","5","1"))
+```
+
+## Version 1
+
+```{r, fig.height=15,eval=TRUE}
+## draw! 
+
+# heatmap-MS1-v1-basic
+h1 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  row_order = row_order,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+
+```
+
+## Version 2
+
+```{r}
+
+# heatmap-MS1-v2-clusters
+h2 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  cluster_rows = row_dend,
+  row_dend_width = grid::unit(0.1, "cm"),
+  row_dend_gp = grid::gpar(col = "white"),
+  row_split = 5,
+
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+h2
+```
+
+## Version 3
+
+```{r}
+# heatmap-MS1-v3-clusters-with-dend
+h3 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  cluster_rows = row_dend,
+  row_dend_width = grid::unit(4, "cm"),
+  row_dend_gp = grid::gpar(col = "black"),
+  row_split = 5,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled Abundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+h3
+```
+
+## Version 4
+
+```{r}
+
+
+# heatmap-MS1-v4-time-comp
+h4 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  #cluster_rows = row_dend,
+  row_dend_width = grid::unit(0.1, "cm"),
+  row_dend_gp = grid::gpar(col = "white"),
+  row_split = row_split,
+  cluster_row_slices = FALSE,
+  
+  #row_order = row_order,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
+  #column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  # 25 cm is the maximum to print in portrait orientation on A4
+  height=grid::unit(10, "cm"), # change to 10 to visualise in RStudio
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 8),
+  row_title_gp = grid::gpar(fontsize = 10),
+  
+  column_labels = col_labels
+)
+h4
+
 ```
