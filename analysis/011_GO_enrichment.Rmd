@@ -261,7 +261,6 @@ write_csv(enrich5_df, csv_filename)
 
 Read data from csv file.
 
-
 ```{r}
 targets = readxl::read_xlsx("Pmk1 direct targets PRM_101122.xlsx") %>% 
   dplyr::select(`Phosphorylation position`) %>% unique()
