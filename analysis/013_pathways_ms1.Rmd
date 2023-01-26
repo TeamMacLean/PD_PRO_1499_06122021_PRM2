@@ -1,0 +1,288 @@
+---
+title: "Pathways in MS1"
+author: "Clara Jégousse"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+# Objectives
+
+According to Neftaly, the objectives are:
+
+To retrieve the phosphorylation values (scaled abundance) of phosphopeptides found for all of these proteins in the MS1 dataset at all time points.
+
+To plot small heatmaps for each pathway with all the phosphopeptides found for their proteins in the strains Guy11 and Dpmk1
+
+# Libraries
+
+```{r, warning=FALSE, message=FALSE}
+library(here)
+library(readr)
+library(dplyr)
+```
+
+
+# Load the data
+
+## Selected proteins and pathways
+
+Let's start by loading the selected phosphopeptides:
+
+```{r, warning=FALSE}
+pathways_filepath = paste0(here::here(), "/cleaned/013_pathways.xlsx")
+pathways = readxl::read_xlsx(pathways_filepath)
+```
+
+There are 91 proteins representing 6 pathways
+
+```{r}
+dim(pathways)
+unique(pathways$pathway) %>% length()
+unique(pathways$id_number) %>% length()
+```
+
+
+## MS1 data
+
+
+### Load and clean the data
+
+```{r}
+ms1_filepath = paste0(here::here(), "/cleaned/ms1_cleaned.csv")
+cleaned = readr::read_csv(ms1_filepath)
+```
+
+### Build the matrix
+
+The long dataframe needs pivot-ing into a matrix. Scaling is applied too. 
+
+```{r}
+ms1_tb <- cleaned %>%
+  mutate(sample_time = paste(sample, time, sep="-"),
+         id = paste(`Positions in Master Proteins`, `Modifications`, sep="-")) %>%
+  select(id, sample_time, value) %>%
+  pivot_wider(names_from = "sample_time", values_from = "value" )
+
+m = ms1_tb
+rows <- m$id
+m$id <- NULL
+raw_m <- as.matrix(m)
+```
+
+### Replace missing values
+
+We can also replace NA with the minimum observed value on the whole abundance data - before scaling and distance measuring.
+
+```{r}
+m <- raw_m
+m[is.na(m)] <- min(m, na.rm=TRUE)
+```
+
+### Scaling
+
+```{r}
+m <- t(apply(m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
+```
+
+
+# Filtering 
+
+```{r}
+colnames(m)
+rownames(m) = ms1_tb$id
+```
+
+
+```{r}
+dim(m)
+```
+
+# HEATMAPS
+
+## CpkA
+
+```{r}
+selected_pathway = pathways %>% filter(pathway == 'CpkA')
+
+selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+row_infos = data.frame(m_rownames = rownames(selected_ms1))
+row_infos = row_infos %>% mutate(
+  id_number = stringr::str_sub(m_rownames, end = 9)
+  )
+row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
+
+mdata = list(row_info = row_infos, data = selected_ms1 )
+
+matrix <- mdata$data
+rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
+colnames(matrix) <- colnames(mdata$data)
+
+col_fun = circlize::colorRamp2(c(0, 1), c( "white", "orange"))
+
+col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
+  simplify = TRUE)[,1]))
+
+hm = ComplexHeatmap::Heatmap(matrix, 
+  #column_split = col_split, 
+  #column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = levels(col_split),
+  show_column_names = TRUE,
+  #column_names_rot = 90,
+  row_order = rownames(matrix), 
+  show_row_names = TRUE,
+  row_names_side = "left",
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun 
+  )
+hm
+```
+
+
+## pmk1
+
+```{r}
+selected_pathway = pathways %>% filter(pathway == 'pmk1')
+
+selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+row_infos = data.frame(m_rownames = rownames(selected_ms1))
+row_infos = row_infos %>% mutate(
+  id_number = stringr::str_sub(m_rownames, end = 9)
+  )
+row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
+
+mdata = list(row_info = row_infos, data = selected_ms1 )
+
+matrix <- mdata$data
+rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
+colnames(matrix) <- colnames(mdata$data)
+
+col_fun = circlize::colorRamp2(c(0, 1), c( "white", "salmon"))
+
+col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
+  simplify = TRUE)[,1]))
+
+hm1 = ComplexHeatmap::Heatmap(matrix, 
+  #column_split = col_split, 
+  #column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = levels(col_split),
+  show_column_names = TRUE,
+  #column_names_rot = 90,
+  row_order = rownames(matrix), 
+  show_row_names = TRUE,
+  row_names_side = "left",
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun 
+  )
+hm1
+```
+
+## Sln1/HOG
+
+```{r}
+selected_pathway = pathways %>% filter(pathway == 'Sln1/HOG')
+
+selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+row_infos = data.frame(m_rownames = rownames(selected_ms1))
+row_infos = row_infos %>% mutate(
+  id_number = stringr::str_sub(m_rownames, end = 9)
+  )
+row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
+
+mdata = list(row_info = row_infos, data = selected_ms1 )
+
+matrix <- mdata$data
+rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
+colnames(matrix) <- colnames(mdata$data)
+
+col_fun = circlize::colorRamp2(c(0, 1), c( "white", "darkolivegreen3"))
+
+col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
+  simplify = TRUE)[,1]))
+
+hm2 = ComplexHeatmap::Heatmap(matrix, 
+  #column_split = col_split, 
+  #column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = levels(col_split),
+  show_column_names = TRUE,
+  #column_names_rot = 90,
+  row_order = rownames(matrix), 
+  show_row_names = TRUE,
+  row_names_side = "left",
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun 
+  )
+hm2
+```
+
+
+```{r}
+ComplexHeatmap::draw(hm %v% hm1 %v% hm2)
+```
+## loop
+
+
+
+## Sln1/HOG
+
+```{r}
+
+hm_list = list()
+
+colours = c(
+  'gold', 'orange', 'darkolivegreen3', 'deepskyblue4', 'darkgrey', 'salmon'
+)
+names(colours) = unique(pathways$pathway)
+
+for (p in unique(pathways$pathway)) {
+  #print(p)
+  selected_pathway = pathways %>% filter(pathway == p)
+  
+  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+  row_infos = data.frame(m_rownames = rownames(selected_ms1))
+  row_infos = row_infos %>% mutate(
+    id_number = stringr::str_sub(m_rownames, end = 9)
+    )
+  row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
+  
+  mdata = list(row_info = row_infos, data = selected_ms1 )
+  
+  matrix <- mdata$data
+  rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
+  colnames(matrix) <- colnames(mdata$data)
+  
+  col_fun = circlize::colorRamp2(c(0, 1), c( "white", colours[p]))
+  
+  col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
+    simplify = TRUE)[,1]))
+  
+  hm = ComplexHeatmap::Heatmap(matrix, 
+    #column_split = col_split, 
+    #column_title_gp = grid::gpar(fontsize = 8),
+    column_gap = grid::unit(0.25, "cm"),
+    column_order = levels(col_split),
+    show_column_names = TRUE,
+    #column_names_rot = 90,
+    row_order = rownames(matrix), 
+    show_row_names = TRUE,
+    row_names_side = "left",
+    rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+    col = col_fun 
+  )
+  hm
+  
+  
+  
+  hm_list[[p]] = hm
+}
+
+
+```
+
+```{r}
+ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG`)
+```
+
