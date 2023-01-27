@@ -20,6 +20,9 @@ To plot small heatmaps for each pathway with all the phosphopeptides found for t
 library(here)
 library(readr)
 library(dplyr)
+library(tidyr)
+
+library(ComplexHeatmap)
 ```
 
 
@@ -98,191 +101,177 @@ rownames(m) = ms1_tb$id
 dim(m)
 ```
 
-# HEATMAPS
-
-## CpkA
-
-```{r}
-selected_pathway = pathways %>% filter(pathway == 'CpkA')
-
-selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
-row_infos = data.frame(m_rownames = rownames(selected_ms1))
-row_infos = row_infos %>% mutate(
-  id_number = stringr::str_sub(m_rownames, end = 9)
-  )
-row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
-
-mdata = list(row_info = row_infos, data = selected_ms1 )
-
-matrix <- mdata$data
-rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
-colnames(matrix) <- colnames(mdata$data)
-
-col_fun = circlize::colorRamp2(c(0, 1), c( "white", "orange"))
-
-col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
-  simplify = TRUE)[,1]))
-
-hm = ComplexHeatmap::Heatmap(matrix, 
-  #column_split = col_split, 
-  #column_title_gp = grid::gpar(fontsize = 8),
-  column_gap = grid::unit(0.25, "cm"),
-  column_order = levels(col_split),
-  show_column_names = TRUE,
-  #column_names_rot = 90,
-  row_order = rownames(matrix), 
-  show_row_names = TRUE,
-  row_names_side = "left",
-  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
-  col = col_fun 
-  )
-hm
-```
+# Heatmaps
 
 
-## pmk1
+We create an empty heatmap list that will store all the heatmaps:
 
 ```{r}
-selected_pathway = pathways %>% filter(pathway == 'pmk1')
-
-selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
-row_infos = data.frame(m_rownames = rownames(selected_ms1))
-row_infos = row_infos %>% mutate(
-  id_number = stringr::str_sub(m_rownames, end = 9)
-  )
-row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
-
-mdata = list(row_info = row_infos, data = selected_ms1 )
-
-matrix <- mdata$data
-rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
-colnames(matrix) <- colnames(mdata$data)
-
-col_fun = circlize::colorRamp2(c(0, 1), c( "white", "salmon"))
-
-col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
-  simplify = TRUE)[,1]))
-
-hm1 = ComplexHeatmap::Heatmap(matrix, 
-  #column_split = col_split, 
-  #column_title_gp = grid::gpar(fontsize = 8),
-  column_gap = grid::unit(0.25, "cm"),
-  column_order = levels(col_split),
-  show_column_names = TRUE,
-  #column_names_rot = 90,
-  row_order = rownames(matrix), 
-  show_row_names = TRUE,
-  row_names_side = "left",
-  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
-  col = col_fun 
-  )
-hm1
-```
-
-## Sln1/HOG
-
-```{r}
-selected_pathway = pathways %>% filter(pathway == 'Sln1/HOG')
-
-selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
-row_infos = data.frame(m_rownames = rownames(selected_ms1))
-row_infos = row_infos %>% mutate(
-  id_number = stringr::str_sub(m_rownames, end = 9)
-  )
-row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
-
-mdata = list(row_info = row_infos, data = selected_ms1 )
-
-matrix <- mdata$data
-rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
-colnames(matrix) <- colnames(mdata$data)
-
-col_fun = circlize::colorRamp2(c(0, 1), c( "white", "darkolivegreen3"))
-
-col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
-  simplify = TRUE)[,1]))
-
-hm2 = ComplexHeatmap::Heatmap(matrix, 
-  #column_split = col_split, 
-  #column_title_gp = grid::gpar(fontsize = 8),
-  column_gap = grid::unit(0.25, "cm"),
-  column_order = levels(col_split),
-  show_column_names = TRUE,
-  #column_names_rot = 90,
-  row_order = rownames(matrix), 
-  show_row_names = TRUE,
-  row_names_side = "left",
-  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
-  col = col_fun 
-  )
-hm2
-```
-
-
-```{r}
-ComplexHeatmap::draw(hm %v% hm1 %v% hm2)
-```
-## loop
-
-
-
-## Sln1/HOG
-
-```{r}
-
 hm_list = list()
+```
 
-colours = c(
-  'gold', 'orange', 'darkolivegreen3', 'deepskyblue4', 'darkgrey', 'salmon'
-)
-names(colours) = unique(pathways$pathway)
+We set a colour scheme matching the original Excel document in which each pathway correspond to one colour:
 
+```{r}
+pathway_colours = c(
+  'gold', 'orange', 'darkolivegreen3', 
+  'deepskyblue4', 'darkgrey', 'salmon')
+names(pathway_colours) = unique(pathways$pathway)
+```
+
+Then, using a loop, we make one heatmap for each pathway:
+
+```{r}
 for (p in unique(pathways$pathway)) {
+  
   #print(p)
+  
+  # retrieve the list of all the protein names and id number for the pathway p 
   selected_pathway = pathways %>% filter(pathway == p)
   
+  # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
   selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+  
+  # store the row information (peptide and gene identifiers)
   row_infos = data.frame(m_rownames = rownames(selected_ms1))
+  
+  # build the protein id number from the gene number (removed the last two caracter 'T0')
   row_infos = row_infos %>% mutate(
     id_number = stringr::str_sub(m_rownames, end = 9)
     )
+  
+  # join all the row information
   row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
   
-  mdata = list(row_info = row_infos, data = selected_ms1 )
+  # 'bind' together the matrix of scaled abundance values and the row information
+  mdata = list(row_info = row_infos, data = selected_ms1)
   
+  # build a matrix to use the ComplexHeatmap package
   matrix <- mdata$data
-  rownames(matrix) <- paste(mdata$row_info[,'protein_name'], mdata$row_info[,'id_number'])
+  rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
+    mdata$row_info[,'id_number'])
   colnames(matrix) <- colnames(mdata$data)
   
-  col_fun = circlize::colorRamp2(c(0, 1), c( "white", colours[p]))
+  # create the colour gradient matching the colour representing the pathway
+  col_fun = circlize::colorRamp2(c(0, 1), c( "white", pathway_colours[p]))
   
-  col_split = factor(paste(stringr::str_split(colnames(matrix), "_", n = 3, 
+  # set the title of the legend
+  lgd_title = paste0("Scaled\nabundance\n(", p, ")")
+  
+  # organise columns according to genotype and timepoints
+  col_split = factor(paste(stringr::str_split(colnames(matrix), "_", 
+    n = 3, 
     simplify = TRUE)[,1]))
   
+  # build the heatmap
   hm = ComplexHeatmap::Heatmap(matrix, 
     #column_split = col_split, 
-    #column_title_gp = grid::gpar(fontsize = 8),
-    column_gap = grid::unit(0.25, "cm"),
+    column_gap = grid::unit(0.25, "cm"), 
     column_order = levels(col_split),
     show_column_names = TRUE,
-    #column_names_rot = 90,
+    column_title = p,
     row_order = rownames(matrix), 
     show_row_names = TRUE,
     row_names_side = "left",
     rect_gp = grid::gpar(col = "white", lwd = 2 ), 
-    col = col_fun 
+    col = col_fun,
+    show_heatmap_legend = FALSE,
+    heatmap_legend_param = list(title = lgd_title)
   )
-  hm
-  
-  
-  
+
+  # store the heatmap in our list
   hm_list[[p]] = hm
+  
+  pdfname = gsub('/', '-', paste0(p, ".pdf"))
+  pdf(file = pdfname, width = 10, height = 10 )
+  print(hm)
+  dev.off()
 }
-
-
 ```
+
+
+Plot all the heatmap together
 
 ```{r}
-ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG`)
+ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG` %v% hm_list$`Septin-oligomerisation` %v% hm_list$Vast %v% hm_list$Autophagy)
 ```
 
+## Alternative
+
+```{r}
+for (p in unique(pathways$pathway)) {
+  
+  #print(p)
+  
+  # retrieve the list of all the protein names and id number for the pathway p 
+  selected_pathway = pathways %>% filter(pathway == p)
+  
+  # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
+  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+  
+  # store the row information (peptide and gene identifiers)
+  row_infos = data.frame(m_rownames = rownames(selected_ms1))
+  
+  # build the protein id number from the gene number (removed the last two caracter 'T0')
+  row_infos = row_infos %>% mutate(
+    id_number = stringr::str_sub(m_rownames, end = 9)
+    )
+  
+  # join all the row information
+  row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
+  
+  row_ha = ComplexHeatmap::rowAnnotation(pathway = row_infos$pathway,
+  col = list(pathway = pathway_colours),
+  simple_anno_size = grid::unit(0.5, "cm"), 
+  show_legend = FALSE, 
+  annotation_name_gp = grid::gpar(fontsize = 8)#,
+  #gp = grid::gpar(col = "black", lwd = 1)
+  )
+  
+  # 'bind' together the matrix of scaled abundance values and the row information
+  mdata = list(row_info = row_infos, data = selected_ms1)
+  
+  # build a matrix to use the ComplexHeatmap package
+  matrix <- mdata$data
+  rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
+    mdata$row_info[,'id_number'])
+  colnames(matrix) <- colnames(mdata$data)
+  
+   # use viridis
+  pal <- viridis::viridis_pal()
+  colours <-  pal(11)
+  
+  # organise columns according to genotype and timepoints
+  col_split = factor(stringr::str_split(colnames(matrix), "-", n = 2, simplify = TRUE)[,1], levels = c("Guy11", "dpmk1"))
+  
+  col_order = colnames(matrix)
+  
+  # build the heatmap
+  hm = ComplexHeatmap::Heatmap(matrix, 
+    column_split = col_split, 
+    column_gap = grid::unit(0.25, "cm"), 
+    column_order = col_order,
+    show_column_names = TRUE,
+    column_title = p,
+    width = grid::unit(4, "cm"),
+    row_order = rownames(matrix), 
+    show_row_names = TRUE,
+    row_names_side = "left",
+    right_annotation = row_ha,
+    rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+    col = colours,
+    show_heatmap_legend = FALSE,
+    heatmap_legend_param = list(title = "Scaled"),
+    column_names_gp = grid::gpar(fontsize=10),
+    row_names_gp = grid::gpar(fontsize=4)
+  )
+
+  # store the heatmap in our list
+  hm_list[[p]] = hm
+  
+  pdfname = gsub('/', '-', paste0(p, ".pdf"))
+  pdf(file = pdfname, width = 10, height = 10 )
+  print(hm)
+  dev.off()
+}
+```

@@ -1,6 +1,3 @@
-
-
-
 ## PRM analysis M.oryzae _Guy11_ vs _dpmk1_
 
 This repo contains PRM analysis of _Magnaporthe oryzae_ strains _Guy11_ vs _dpmk1_.
@@ -26,3 +23,13 @@ Performed as described in the repo `.Rmd` using the tools previously developed i
 
   * 01-12-22 [CJ]
   Add one heatmap showing selected targets (direct targets of pmk1) as annotation and one heatmap only displaying the selected targets; also add GO enrichement of the proteins corresponding to the selected targets. 
+  
+  * 15-12-22 [CJ]
+  Qualitative comparison PRM and MS1 (based on visual trends).
+  
+  * 27-01-2023 [CJ]
+  MS1 heatmap for select pathways.
+  
+  ## TODO
+  
+  - [ ] Re-organise directories for input files and output files.
