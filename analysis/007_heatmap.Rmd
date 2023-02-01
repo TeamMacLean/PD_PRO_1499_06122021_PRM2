@@ -482,10 +482,20 @@ We use the `facet_wrap()` function from the `ggplot2` package to have consistent
 ```{r}
 # PRM-68-selected-pep-barplots.pdf
 ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)) + 
-  ggplot2::geom_bar(position="dodge", stat="identity") + 
+  ggplot2::geom_bar(position="dodge", stat = "identity") + 
   ggplot2::scale_fill_manual(values = c(chosen_red, chosen_blue), name = "", 
     labels = c(expression(paste(Delta, "pmk1")), 'Guy11')) +
-  ggplot2::facet_wrap(~ gene_id) + 
+  ggplot2::facet_wrap(~ gene_id, scales = "free") + 
   ggplot2::theme_minimal() + 
-  ggplot2::theme(strip.text.x = element_text(size = 3))
+  ggplot2::theme(strip.text.x = element_text(size = 4))
+```
+
+Save the plots.
+
+```{r}
+graphics_dir = paste(here(), "graphics", sep = "/")
+pdf_filename = paste(graphics_dir, "007-prm-68-selected-pep-barplots.pdf", sep = "/")
+pdf(file = pdf_filename, width = 16, height = 9)
+last_plot()
+dev.off()
 ```
