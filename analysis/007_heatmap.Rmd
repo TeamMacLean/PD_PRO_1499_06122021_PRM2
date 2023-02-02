@@ -1,6 +1,6 @@
 ---
 title: "007 Heatmap"
-author: "Dan MacLean"
+author: "Dan MacLean and Clara Jegousse"
 date: "25/01/2022"
 output: html_document
 ---
@@ -250,7 +250,7 @@ Update: November 2022 by Clara
 Load the list of targets from the excel document sent by Neftaly.
 
 ```{r}
-file = here::here("analysis", "Pmk1 direct targets PRM_101122.xlsx")
+file = here::here("data", "raw", "Pmk1 direct targets PRM_101122.xlsx")
 
 targets = readxl::read_xlsx(file) %>% 
   dplyr::mutate(gene_peptide = paste(`Phosphorylation position`, Peptide)) %>%
