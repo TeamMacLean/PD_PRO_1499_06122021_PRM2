@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Frank would like a heatmap of some MS1 data, clustered on `Guy11` samples only and scaled by row in the range 0 - 1.
 
-## Load and clean the data
+## Load libraries
 
 ```{r}
 library(readxl)
@@ -21,12 +21,18 @@ library(here)
 library(dplyr)
 library(tidyr)
 library(readr)
+library(stringr)
+```
 
-file <- here("data/raw/Nrc210121_rgm2r.xlsx" )
+
+## Load and clean the data
+
+```{r, include=FALSE, eval=FALSE}
+file <- here("data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx" )
 
 cleaned <- read_excel(file, sheet=excel_sheets(file)) |> 
-  select(`Positions in Master Proteins`, `Modifications`, starts_with("Abundances (Grouped):")) |> 
-  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`), names_to = "sample") |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
   mutate(
     sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
   ) |> 
@@ -36,6 +42,31 @@ cleaned <- read_excel(file, sheet=excel_sheets(file)) |>
 write_csv(cleaned, here("data/cleaned/ms1_cleaned.csv"))
 
 ```
+
+CJ: The next code chunk is adds a column `Label Modifications in Master Proteins` to meet Neftaly's and Frank's request for labels in heatmaps in subsequent analysis. 
+
+```{r}
+file <- here("data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx" )
+
+cleaned <- read_excel(file, sheet=excel_sheets(file)) |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
+  mutate(
+    sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
+  ) |> 
+  separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
+  distinct() %>% 
+  mutate(`Label Modifications in Master Proteins` = str_extract_all(`Modifications in Master Proteins`, "\\[(.*)\\]", simplify = TRUE) %>%
+   gsub("\\[|\\]", "", .) %>%
+  gsub("\\s*\\([^\\)]+\\)", "", .) %>%
+  str_replace(., "N-Term; ", "") %>%
+  str_replace(., "1xPhospho ", "") %>%
+  str_replace(., "2xPhospho ", "")) %>%
+   mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
+
+write_csv(cleaned, here("data/cleaned/ms1_cleaned.csv"))
+```
+
 
 ## Build the matrix
 

@@ -22,6 +22,7 @@ library(readr)
 library(readxl)
 library(dplyr)
 library(tidyr)
+library(stringr)
 
 library(ComplexHeatmap)
 ```
@@ -69,7 +70,7 @@ The long dataframe needs pivot-ing into a matrix. Scaling is applied too.
 ```{r}
 ms1_tb <- cleaned %>%
   mutate(sample_time = paste(sample, time, sep="-"),
-         id = paste(`Positions in Master Proteins`, `Modifications`, sep="-")) %>%
+         id = paste(`Positions in Master Proteins`, `Annotated Sequence`, `Modifications`, `Label Modifications in Master Proteins`,  sep = "|")) %>%
   select(id, sample_time, value) %>%
   pivot_wider(names_from = "sample_time", values_from = "value" )
 
@@ -78,6 +79,29 @@ rows <- m$id
 m$id <- NULL
 raw_m <- as.matrix(m)
 ```
+
+
+### Labels
+
+```{r}
+raw_filepath = paste0(here::here(), "/data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx")
+raw = read_excel(raw_filepath)
+```
+
+
+```{r}
+raw %>% 
+  mutate(modif_position_label = str_extract_all(`Modifications in Master Proteins`, "\\[(.*)\\]", simplify = TRUE) %>%
+   gsub("\\[|\\]", "", .) %>%
+  gsub("\\s*\\([^\\)]+\\)", "", .) %>%
+  str_replace(., "N-Term; ", "") %>%
+  str_replace(., "1xPhospho ", "") %>%
+  str_replace(., "2xPhospho ", "")) %>%
+  mutate(id = paste(`Positions in Master Proteins`, `Modifications`,  sep = "-")) %>%
+  select(id, modif_position_label)
+
+```
+
 
 ### Replace missing values
 
@@ -91,7 +115,7 @@ m[is.na(m)] <- min(m, na.rm=TRUE)
 ### Scaling
 
 ```{r}
-m_scaled <- t(apply(m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
+m_scaled <- t(apply(m, 1, function(x)(x-min(x, na.rm = TRUE))/(max(x, na.rm = TRUE)-min(x,na.rm = TRUE))))
 ```
 
 Assign column names and row names to the scaled matrix
@@ -120,7 +144,7 @@ We set a colour scheme matching the original Excel document in which each pathwa
 ```{r}
 pathway_colours = c(
   'gold', 'orange', 'darkolivegreen3', 
-  'deepskyblue4', 'darkgrey', 'salmon')
+  'deepskyblue4', 'darkgrey', 'salmon', 'orchid4', "seagreen")
 names(pathway_colours) = unique(pathways$pathway)
 ```
 
@@ -137,7 +161,7 @@ for (p in unique(pathways$pathway)) {
   selected_pathway = pathways %>% filter(pathway == p)
   
   # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
-  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse = "|"), ms1_tb$id),]
   
   # store the row information (peptide and gene identifiers)
   row_infos = data.frame(m_rownames = rownames(selected_ms1))
@@ -156,7 +180,8 @@ for (p in unique(pathways$pathway)) {
   # build a matrix to use the ComplexHeatmap package
   matrix <- mdata$data
   rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
-    mdata$row_info[,'m_rownames'])
+    mdata$row_info[,'id_number'],
+    str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,4])
   colnames(matrix) <- colnames(mdata$data)
   
   # create the colour gradient matching the colour representing the pathway
@@ -188,13 +213,6 @@ for (p in unique(pathways$pathway)) {
 
   # store the heatmap in our list
   hm_list[[p]] = hm
-  
-  graphics_dir = paste(here(), "graphics", sep = "/")
-  pdf_name = gsub('/', '-', paste0("013-ms1-pathway-", p, ".pdf"))
-  pdf_filename = paste(graphics_dir, pdf_name, sep = "/")
-  pdf(file = pdf_filename, width = 12, height = 10 )
-  print(hm)
-  dev.off()
 }
 ```
 
@@ -224,8 +242,7 @@ for (p in unique(pathways$pathway)) {
   
   # build the protein id number from the gene number (removed the last two caracter 'T0')
   row_infos = row_infos %>% mutate(
-    id_number = stringr::str_sub(m_rownames, end = 9)
-    )
+    id_number = stringr::str_sub(m_rownames, end = 9))
   
   # join all the row information
   row_infos = left_join(row_infos, selected_pathway, by = "id_number", keep = FALSE)
@@ -245,8 +262,12 @@ for (p in unique(pathways$pathway)) {
   
   # build a matrix to use the ComplexHeatmap package
   matrix <- mdata$data
-  rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
-    mdata$row_info[,'m_rownames'])
+
+   rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
+   str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,1] ,
+       str_split(str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,2], "\\.", n = Inf, simplify = TRUE)[,2],
+    str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,4])
+  
   colnames(matrix) <- colnames(mdata$data)
   
    # use viridis
@@ -272,19 +293,21 @@ for (p in unique(pathways$pathway)) {
     show_row_names = TRUE,
     row_names_side = "left",
     right_annotation = row_ha,
-    rect_gp = grid::gpar(col = "white", lwd = 1 ), 
+    rect_gp = grid::gpar(col = "white", lwd = 0.5 ), 
     col = colours,
     show_heatmap_legend = FALSE,
     heatmap_legend_param = list(title = "Scaled"),
     column_names_gp = grid::gpar(fontsize = 8),
-    row_names_gp = grid::gpar(fontsize = 3)
+    row_names_gp = grid::gpar(fontsize = 2)
   )
 
   # store the heatmap in our list
   hm_list[[p]] = hm
   
-  pdfname = gsub('/', '-', paste0(p, ".pdf"))
-  pdf(file = pdfname, width = 10, height = 10 )
+  graphics_dir = paste(here(), "graphics", sep = "/")
+  pdf_name = gsub('/', '-', paste0("013-ms1-pathway-", p, ".pdf"))
+  pdf_filename = paste(graphics_dir, pdf_name, sep = "/")
+  pdf(file = pdf_filename, width = 12, height = 10 )
   print(hm)
   dev.off()
 }
@@ -292,12 +315,25 @@ for (p in unique(pathways$pathway)) {
 
 
 ```{r}
-ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]]
+ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]]
 
 graphics_dir = paste(here(), "graphics", sep = "/")
 pdf_filename = paste(graphics_dir, "013-ms1-pathways.pdf", sep = "/")
-pdf(file = pdf_filename, height = 11.69, width = 8.27)
+pdf(file = pdf_filename, height = 12, width = 8.27)
 ComplexHeatmap::draw(ht_list)
+dev.off()
+```
+
+
+# Steve proteins
+
+For a collaborator interested in knowing the phosphorylation of the proteins he is working with (Steve proteins)
+
+```{r, eval=FALSE}
+graphics_dir = paste(here(), "graphics", sep = "/")
+pdf_filename = paste(graphics_dir, "013-ms1-pathways-steve.pdf", sep = "/")
+pdf(file = pdf_filename, height = 4, width = 10)
+hm_list[[8]]
 dev.off()
 ```
 

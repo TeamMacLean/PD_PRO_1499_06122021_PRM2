@@ -11,7 +11,7 @@
 
 <meta name="author" content="Clara Jégousse" />
 
-<meta name="date" content="2023-02-01" />
+<meta name="date" content="2023-02-10" />
 
 <title>Pathways in MS1</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Pathways in MS1</h1>
 <h4 class="author">Clara Jégousse</h4>
-<h4 class="date">2023-02-01</h4>
+<h4 class="date">2023-02-10</h4>
 
 </div>
 
@@ -373,6 +373,7 @@ library(readr)
 library(readxl)
 library(dplyr)
 library(tidyr)
+library(stringr)
 
 library(ComplexHeatmap)</code></pre>
 </div>
@@ -385,11 +386,11 @@ library(ComplexHeatmap)</code></pre>
 pathways = read_xlsx(pathways_filepath)</code></pre>
 <p>There are 91 proteins representing 6 pathways</p>
 <pre class="r"><code>dim(pathways)</code></pre>
-<pre><code>## [1] 91  3</code></pre>
+<pre><code>## [1] 130   3</code></pre>
 <pre class="r"><code>unique(pathways$pathway) %&gt;% length()</code></pre>
-<pre><code>## [1] 6</code></pre>
+<pre><code>## [1] 8</code></pre>
 <pre class="r"><code>unique(pathways$id_number) %&gt;% length()</code></pre>
-<pre><code>## [1] 87</code></pre>
+<pre><code>## [1] 121</code></pre>
 </div>
 <div id="ms1-data" class="section level2">
 <h2>MS1 data</h2>
@@ -397,29 +398,32 @@ pathways = read_xlsx(pathways_filepath)</code></pre>
 <h3>Load and clean the data</h3>
 <pre class="r"><code>ms1_filepath = paste0(here::here(), &quot;/data/cleaned/ms1_cleaned.csv&quot;)
 cleaned = read_csv(ms1_filepath)</code></pre>
-<pre><code>## Rows: 79800 Columns: 5
+<pre><code>## Rows: 79800 Columns: 8
 ## ── Column specification ────────────────────────────────────────────────────────
 ## Delimiter: &quot;,&quot;
-## chr (3): Positions in Master Proteins, Modifications, sample
+## chr (6): Positions in Master Proteins, Modifications in Master Proteins, Mod...
 ## dbl (2): time, value
 ## 
 ## ℹ Use `spec()` to retrieve the full column specification for this data.
 ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
 <pre class="r"><code>cleaned %&gt;% filter(sample == &quot;dpmk1&quot; &amp; time == 0)</code></pre>
-<pre><code>## # A tibble: 6,650 × 5
-##    `Positions in Master Proteins` Modifications               time sample  value
-##    &lt;chr&gt;                          &lt;chr&gt;                      &lt;dbl&gt; &lt;chr&gt;   &lt;dbl&gt;
-##  1 MGG_01819T0 [15-38]            1xPhospho [S4(87.2)]           0 dpmk1  5.30e8
-##  2 MGG_01819T0 [15-38]            1xPhospho [S/T]                0 dpmk1  5.30e8
-##  3 MGG_01819T0 [15-38]            1xPhospho [S3(86.6)]           0 dpmk1  5.30e8
-##  4 MGG_00513T0 [13-32]            2xPhospho [S3(86.1); S9(7…     0 dpmk1  3.29e8
-##  5 MGG_00513T0 [13-32]            2xPhospho [T4(84.1); S9(9…     0 dpmk1  3.29e8
-##  6 MGG_00513T0 [13-32]            2xPhospho [S3(89.6); T4(7…     0 dpmk1  3.29e8
-##  7 MGG_00513T0 [11-32]            3xPhospho [S3(97.9); S/T]      0 dpmk1  3.15e8
-##  8 MGG_00432T0 [1-23]             1xMet-loss [N-Term];2xPho…     0 dpmk1  2.26e8
-##  9 MGG_00432T0 [1-23]             1xMet-loss [N-Term];2xPho…     0 dpmk1  2.21e8
-## 10 MGG_00513T0 [13-32]            1xPhospho [S/T]                0 dpmk1  2.16e8
-## # … with 6,640 more rows</code></pre>
+<pre><code>## # A tibble: 6,650 × 8
+##    Positions in Master Pro…¹ Modif…² Modif…³ Annot…⁴  time sample  value Label…⁵
+##    &lt;chr&gt;                     &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;   &lt;dbl&gt; &lt;chr&gt;   &lt;dbl&gt; &lt;chr&gt;  
+##  1 MGG_01819T0 [15-38]       MGG_01… 1xPhos… [R].RP…     0 dpmk1  5.30e8 S18    
+##  2 MGG_01819T0 [15-38]       &lt;NA&gt;    1xPhos… [R].RP…     0 dpmk1  5.30e8 S/T    
+##  3 MGG_01819T0 [15-38]       MGG_01… 1xPhos… [R].RP…     0 dpmk1  5.30e8 S17    
+##  4 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 S15; S…
+##  5 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 T16; S…
+##  6 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 S15; T…
+##  7 MGG_00513T0 [11-32]       MGG_00… 3xPhos… [R].ER…     0 dpmk1  3.15e8 S21; S…
+##  8 MGG_00432T0 [1-23]        MGG_00… 1xMet-… [-].MS…     0 dpmk1  2.26e8 S10; S…
+##  9 MGG_00432T0 [1-23]        MGG_00… 1xMet-… [-].MS…     0 dpmk1  2.21e8 S10; S…
+## 10 MGG_00513T0 [13-32]       &lt;NA&gt;    1xPhos… [R].SN…     0 dpmk1  2.16e8 S/T    
+## # … with 6,640 more rows, and abbreviated variable names
+## #   ¹​`Positions in Master Proteins`, ²​`Modifications in Master Proteins`,
+## #   ³​Modifications, ⁴​`Annotated Sequence`,
+## #   ⁵​`Label Modifications in Master Proteins`</code></pre>
 </div>
 <div id="build-the-matrix" class="section level3">
 <h3>Build the matrix</h3>
@@ -427,7 +431,7 @@ cleaned = read_csv(ms1_filepath)</code></pre>
 too.</p>
 <pre class="r"><code>ms1_tb &lt;- cleaned %&gt;%
   mutate(sample_time = paste(sample, time, sep=&quot;-&quot;),
-         id = paste(`Positions in Master Proteins`, `Modifications`, sep=&quot;-&quot;)) %&gt;%
+         id = paste(`Positions in Master Proteins`, `Annotated Sequence`, `Modifications`, `Label Modifications in Master Proteins`,  sep = &quot;|&quot;)) %&gt;%
   select(id, sample_time, value) %&gt;%
   pivot_wider(names_from = &quot;sample_time&quot;, values_from = &quot;value&quot; )
 
@@ -435,6 +439,34 @@ m = ms1_tb
 rows &lt;- m$id
 m$id &lt;- NULL
 raw_m &lt;- as.matrix(m)</code></pre>
+</div>
+<div id="labels" class="section level3">
+<h3>Labels</h3>
+<pre class="r"><code>raw_filepath = paste0(here::here(), &quot;/data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx&quot;)
+raw = read_excel(raw_filepath)</code></pre>
+<pre class="r"><code>raw %&gt;% 
+  mutate(modif_position_label = str_extract_all(`Modifications in Master Proteins`, &quot;\\[(.*)\\]&quot;, simplify = TRUE) %&gt;%
+   gsub(&quot;\\[|\\]&quot;, &quot;&quot;, .) %&gt;%
+  gsub(&quot;\\s*\\([^\\)]+\\)&quot;, &quot;&quot;, .) %&gt;%
+  str_replace(., &quot;N-Term; &quot;, &quot;&quot;) %&gt;%
+  str_replace(., &quot;1xPhospho &quot;, &quot;&quot;) %&gt;%
+  str_replace(., &quot;2xPhospho &quot;, &quot;&quot;)) %&gt;%
+  mutate(id = paste(`Positions in Master Proteins`, `Modifications`,  sep = &quot;-&quot;)) %&gt;%
+  select(id, modif_position_label)</code></pre>
+<pre><code>## # A tibble: 6,650 × 2
+##    id                                                                    modif…¹
+##    &lt;chr&gt;                                                                 &lt;chr&gt;  
+##  1 MGG_01819T0 [15-38]-1xPhospho [S4(87.2)]                              S18    
+##  2 MGG_01819T0 [15-38]-1xPhospho [S/T]                                   &lt;NA&gt;   
+##  3 MGG_01819T0 [15-38]-1xPhospho [S3(86.6)]                              S17    
+##  4 MGG_00513T0 [13-32]-2xPhospho [S3(86.1); S9(75.2)]                    S15; S…
+##  5 MGG_00513T0 [13-32]-2xPhospho [T4(84.1); S9(93.8)]                    T16; S…
+##  6 MGG_00513T0 [13-32]-2xPhospho [S3(89.6); T4(75.8)]                    S15; T…
+##  7 MGG_00513T0 [11-32]-3xPhospho [S3(97.9); S/T]                         S21; S…
+##  8 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [T22(81.9); S/T]     S10; S…
+##  9 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [S10(99.9); S18(97.… S10; S…
+## 10 MGG_00513T0 [13-32]-1xPhospho [S/T]                                   &lt;NA&gt;   
+## # … with 6,640 more rows, and abbreviated variable name ¹​modif_position_label</code></pre>
 </div>
 <div id="replace-missing-values" class="section level3">
 <h3>Replace missing values</h3>
@@ -445,7 +477,7 @@ m[is.na(m)] &lt;- min(m, na.rm=TRUE)</code></pre>
 </div>
 <div id="scaling" class="section level3">
 <h3>Scaling</h3>
-<pre class="r"><code>m_scaled &lt;- t(apply(m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))</code></pre>
+<pre class="r"><code>m_scaled &lt;- t(apply(m, 1, function(x)(x-min(x, na.rm = TRUE))/(max(x, na.rm = TRUE)-min(x,na.rm = TRUE))))</code></pre>
 <p>Assign column names and row names to the scaled matrix</p>
 <pre class="r"><code>colnames(m_scaled)</code></pre>
 <pre><code>##  [1] &quot;dpmk1-0&quot;   &quot;Guy11-0&quot;   &quot;dpmk1-1&quot;   &quot;Guy11-1&quot;   &quot;dpmk1-1.5&quot; &quot;Guy11-1.5&quot;
@@ -465,7 +497,7 @@ m[is.na(m)] &lt;- min(m, na.rm=TRUE)</code></pre>
 each pathway correspond to one colour:</p>
 <pre class="r"><code>pathway_colours = c(
   &#39;gold&#39;, &#39;orange&#39;, &#39;darkolivegreen3&#39;, 
-  &#39;deepskyblue4&#39;, &#39;darkgrey&#39;, &#39;salmon&#39;)
+  &#39;deepskyblue4&#39;, &#39;darkgrey&#39;, &#39;salmon&#39;, &#39;orchid4&#39;, &quot;seagreen&quot;)
 names(pathway_colours) = unique(pathways$pathway)</code></pre>
 <p>Then, using a loop, we make one heatmap for each pathway:</p>
 <pre class="r"><code>m = m_scaled
@@ -478,7 +510,7 @@ for (p in unique(pathways$pathway)) {
   selected_pathway = pathways %&gt;% filter(pathway == p)
   
   # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
-  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse=&quot;|&quot;), ms1_tb$id),]
+  selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse = &quot;|&quot;), ms1_tb$id),]
   
   # store the row information (peptide and gene identifiers)
   row_infos = data.frame(m_rownames = rownames(selected_ms1))
@@ -497,7 +529,8 @@ for (p in unique(pathways$pathway)) {
   # build a matrix to use the ComplexHeatmap package
   matrix &lt;- mdata$data
   rownames(matrix) &lt;- paste(mdata$row_info[,&#39;protein_name&#39;],
-    mdata$row_info[,&#39;m_rownames&#39;])
+    mdata$row_info[,&#39;id_number&#39;],
+    str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4])
   colnames(matrix) &lt;- colnames(mdata$data)
   
   # create the colour gradient matching the colour representing the pathway
@@ -529,13 +562,6 @@ for (p in unique(pathways$pathway)) {
 
   # store the heatmap in our list
   hm_list[[p]] = hm
-  
-  graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)
-  pdf_name = gsub(&#39;/&#39;, &#39;-&#39;, paste0(&quot;013-ms1-pathway-&quot;, p, &quot;.pdf&quot;))
-  pdf_filename = paste(graphics_dir, pdf_name, sep = &quot;/&quot;)
-  pdf(file = pdf_filename, width = 12, height = 10 )
-  print(hm)
-  dev.off()
 }</code></pre>
 </div>
 <div id="single-heatmap" class="section level1">
@@ -557,8 +583,7 @@ combine them for plotting at the end.</p>
   
   # build the protein id number from the gene number (removed the last two caracter &#39;T0&#39;)
   row_infos = row_infos %&gt;% mutate(
-    id_number = stringr::str_sub(m_rownames, end = 9)
-    )
+    id_number = stringr::str_sub(m_rownames, end = 9))
   
   # join all the row information
   row_infos = left_join(row_infos, selected_pathway, by = &quot;id_number&quot;, keep = FALSE)
@@ -578,8 +603,12 @@ combine them for plotting at the end.</p>
   
   # build a matrix to use the ComplexHeatmap package
   matrix &lt;- mdata$data
-  rownames(matrix) &lt;- paste(mdata$row_info[,&#39;protein_name&#39;],
-    mdata$row_info[,&#39;m_rownames&#39;])
+
+   rownames(matrix) &lt;- paste(mdata$row_info[,&#39;protein_name&#39;],
+   str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,1] ,
+       str_split(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,2], &quot;\\.&quot;, n = Inf, simplify = TRUE)[,2],
+    str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4])
+  
   colnames(matrix) &lt;- colnames(mdata$data)
   
    # use viridis
@@ -605,31 +634,43 @@ combine them for plotting at the end.</p>
     show_row_names = TRUE,
     row_names_side = &quot;left&quot;,
     right_annotation = row_ha,
-    rect_gp = grid::gpar(col = &quot;white&quot;, lwd = 1 ), 
+    rect_gp = grid::gpar(col = &quot;white&quot;, lwd = 0.5 ), 
     col = colours,
     show_heatmap_legend = FALSE,
     heatmap_legend_param = list(title = &quot;Scaled&quot;),
     column_names_gp = grid::gpar(fontsize = 8),
-    row_names_gp = grid::gpar(fontsize = 3)
+    row_names_gp = grid::gpar(fontsize = 2)
   )
 
   # store the heatmap in our list
   hm_list[[p]] = hm
   
-  pdfname = gsub(&#39;/&#39;, &#39;-&#39;, paste0(p, &quot;.pdf&quot;))
-  pdf(file = pdfname, width = 10, height = 10 )
+  graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)
+  pdf_name = gsub(&#39;/&#39;, &#39;-&#39;, paste0(&quot;013-ms1-pathway-&quot;, p, &quot;.pdf&quot;))
+  pdf_filename = paste(graphics_dir, pdf_name, sep = &quot;/&quot;)
+  pdf(file = pdf_filename, width = 12, height = 10 )
   print(hm)
   dev.off()
 }</code></pre>
-<pre class="r"><code>ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]]
+<pre class="r"><code>ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]]
 
 graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)
 pdf_filename = paste(graphics_dir, &quot;013-ms1-pathways.pdf&quot;, sep = &quot;/&quot;)
-pdf(file = pdf_filename, height = 11.69, width = 8.27)
+pdf(file = pdf_filename, height = 12, width = 8.27)
 ComplexHeatmap::draw(ht_list)
 dev.off()</code></pre>
 <pre><code>## quartz_off_screen 
 ##                 2</code></pre>
+</div>
+<div id="steve-proteins" class="section level1">
+<h1>Steve proteins</h1>
+<p>For a collaborator interested in knowing the phosphorylation of the
+proteins he is working with (Steve proteins)</p>
+<pre class="r"><code>graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)
+pdf_filename = paste(graphics_dir, &quot;013-ms1-pathways-steve.pdf&quot;, sep = &quot;/&quot;)
+pdf(file = pdf_filename, height = 4, width = 10)
+hm_list[[8]]
+dev.off()</code></pre>
 </div>
 
 
