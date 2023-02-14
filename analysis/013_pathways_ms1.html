@@ -11,7 +11,7 @@
 
 <meta name="author" content="Clara Jégousse" />
 
-<meta name="date" content="2023-02-10" />
+<meta name="date" content="2023-02-13" />
 
 <title>Pathways in MS1</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Pathways in MS1</h1>
 <h4 class="author">Clara Jégousse</h4>
-<h4 class="date">2023-02-10</h4>
+<h4 class="date">2023-02-13</h4>
 
 </div>
 
@@ -431,7 +431,10 @@ cleaned = read_csv(ms1_filepath)</code></pre>
 too.</p>
 <pre class="r"><code>ms1_tb &lt;- cleaned %&gt;%
   mutate(sample_time = paste(sample, time, sep=&quot;-&quot;),
-         id = paste(`Positions in Master Proteins`, `Annotated Sequence`, `Modifications`, `Label Modifications in Master Proteins`,  sep = &quot;|&quot;)) %&gt;%
+         id = paste(`Positions in Master Proteins`, 
+           `Annotated Sequence`, `Modifications`, 
+           `Label Modifications in Master Proteins`,  
+           sep = &quot;|&quot;)) %&gt;%
   select(id, sample_time, value) %&gt;%
   pivot_wider(names_from = &quot;sample_time&quot;, values_from = &quot;value&quot; )
 

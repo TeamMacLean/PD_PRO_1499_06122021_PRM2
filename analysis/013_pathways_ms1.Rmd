@@ -70,7 +70,10 @@ The long dataframe needs pivot-ing into a matrix. Scaling is applied too.
 ```{r}
 ms1_tb <- cleaned %>%
   mutate(sample_time = paste(sample, time, sep="-"),
-         id = paste(`Positions in Master Proteins`, `Annotated Sequence`, `Modifications`, `Label Modifications in Master Proteins`,  sep = "|")) %>%
+         id = paste(`Positions in Master Proteins`, 
+           `Annotated Sequence`, `Modifications`, 
+           `Label Modifications in Master Proteins`,  
+           sep = "|")) %>%
   select(id, sample_time, value) %>%
   pivot_wider(names_from = "sample_time", values_from = "value" )
 
@@ -265,7 +268,7 @@ for (p in unique(pathways$pathway)) {
 
    rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
    str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,1] ,
-       str_split(str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,2], "\\.", n = Inf, simplify = TRUE)[,2],
+       #str_split(str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,2], "\\.", n = Inf, simplify = TRUE)[,2],
     str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,4])
   
   colnames(matrix) <- colnames(mdata$data)

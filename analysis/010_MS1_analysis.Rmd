@@ -60,17 +60,41 @@ cleaned <- read_excel(file, sheet=excel_sheets(file)) |>
    gsub("\\[|\\]", "", .) %>%
   gsub("\\s*\\([^\\)]+\\)", "", .) %>%
   str_replace(., "N-Term; ", "") %>%
-  str_replace(., "1xPhospho ", "") %>%
-  str_replace(., "2xPhospho ", "")) %>%
-   mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
+  str_replace(., "M([0-9]+); ", "") %>%
+  str_replace(., "1xPhospho", "") %>%
+  str_replace(., "2xPhospho", "")) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
 
 write_csv(cleaned, here("data/cleaned/ms1_cleaned.csv"))
 ```
 
 
+```{r}
+cleaned =  read_excel(file, sheet=excel_sheets(file)) |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
+  mutate(
+    sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
+  ) |> 
+  separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
+  distinct() %>% 
+  # remove 1xMet-loss [N-Term]; 
+  mutate(`Modifications in Master Proteins` = gsub("1xMet-loss \\[N-Term\\]; ", "", x = `Modifications in Master Proteins`)) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(!is.na(`Modifications in Master Proteins`), str_extract_all(`Modifications in Master Proteins`, "\\[.*\\]", simplify = TRUE), str_extract_all(`Modifications`, "\\[.*\\]", simplify = TRUE)) %>%
+  gsub("\\[|\\]", "", .) %>%
+  gsub("\\s*\\([^\\)]+\\)", "", .) %>%
+  str_replace_all(., "N-Term; ", "") %>%
+  str_replace_all(., "M([0-9]+); ", "") %>%
+  str_replace_all(., "1xPhospho ", "") %>%
+  str_replace_all(., "2xPhospho ", "")) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
+```
+
+
+
 ## Build the matrix
 
-The long dataframe needs pivot-ing into a matrix. Scaling is applied too. 
+The long data frame needs pivot-ing into a matrix. Scaling is applied too. 
 
 ```{r}
 
