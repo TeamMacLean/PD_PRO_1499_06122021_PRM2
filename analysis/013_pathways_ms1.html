@@ -11,7 +11,7 @@
 
 <meta name="author" content="Clara Jégousse" />
 
-<meta name="date" content="2023-02-13" />
+<meta name="date" content="2023-02-17" />
 
 <title>Pathways in MS1</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Pathways in MS1</h1>
 <h4 class="author">Clara Jégousse</h4>
-<h4 class="date">2023-02-13</h4>
+<h4 class="date">2023-02-17</h4>
 
 </div>
 
@@ -425,6 +425,28 @@ cleaned = read_csv(ms1_filepath)</code></pre>
 ## #   ³​Modifications, ⁴​`Annotated Sequence`,
 ## #   ⁵​`Label Modifications in Master Proteins`</code></pre>
 </div>
+</div>
+</div>
+<div id="curation" class="section level1">
+<h1>Curation</h1>
+<pre class="r"><code>ms1_curated_filepath = paste0(here::here(), &quot;/data/raw/013_curation/ms1_curated.csv&quot;)
+to_be_removed = read_csv(ms1_curated_filepath) %&gt;% 
+  filter(KEEP == FALSE) </code></pre>
+<pre><code>## Rows: 231 Columns: 17
+## ── Column specification ────────────────────────────────────────────────────────
+## Delimiter: &quot;,&quot;
+## chr (17): id, identifier, modification, KEEP, sequence, dpmk1-0, Guy11-0, dp...
+## 
+## ℹ Use `spec()` to retrieve the full column specification for this data.
+## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
+<pre class="r"><code>#head(to_be_removed$id)
+
+#head(to_be_removed)
+
+cleaned = cleaned %&gt;%
+  mutate(id = paste(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, sep = &quot;|&quot;)) %&gt;%
+  filter(id %in% to_be_removed$id == FALSE) %&gt;%
+  select(-id)</code></pre>
 <div id="build-the-matrix" class="section level3">
 <h3>Build the matrix</h3>
 <p>The long dataframe needs pivot-ing into a matrix. Scaling is applied
@@ -488,8 +510,7 @@ m[is.na(m)] &lt;- min(m, na.rm=TRUE)</code></pre>
 <pre class="r"><code>rownames(m_scaled) = ms1_tb$id</code></pre>
 <p>Check the dimensions of our matrix</p>
 <pre class="r"><code>dim(m_scaled)</code></pre>
-<pre><code>## [1] 6650   12</code></pre>
-</div>
+<pre><code>## [1] 6597   12</code></pre>
 </div>
 </div>
 <div id="heatmaps" class="section level1">
@@ -571,7 +592,28 @@ for (p in unique(pathways$pathway)) {
 <h1>Single heatmap</h1>
 <p>Here we draw all the heatmaps using the viridis colour palette and we
 combine them for plotting at the end.</p>
-<pre class="r"><code>for (p in unique(pathways$pathway)) {
+<pre class="r"><code># use viridis
+pal &lt;- viridis::viridis_pal()
+colours &lt;- pal(11)
+
+library(circlize)</code></pre>
+<pre><code>## ========================================
+## circlize version 0.4.15
+## CRAN page: https://cran.r-project.org/package=circlize
+## Github page: https://github.com/jokergoo/circlize
+## Documentation: https://jokergoo.github.io/circlize_book/book/
+## 
+## If you use it in published research, please cite:
+## Gu, Z. circlize implements and enhances circular visualization
+##   in R. Bioinformatics 2014.
+## 
+## This message can be suppressed by:
+##   suppressPackageStartupMessages(library(circlize))
+## ========================================</code></pre>
+<pre class="r"><code>col_fun = colorRamp2(seq(0,1, by=0.1), colours)
+lgd = Legend(col_fun = col_fun, title = &quot;Scaled\nabundance&quot;)
+
+for (p in unique(pathways$pathway)) {
   
   #print(p)
   
@@ -607,16 +649,13 @@ combine them for plotting at the end.</p>
   # build a matrix to use the ComplexHeatmap package
   matrix &lt;- mdata$data
 
-   rownames(matrix) &lt;- paste(mdata$row_info[,&#39;protein_name&#39;],
-   str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,1] ,
-       str_split(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,2], &quot;\\.&quot;, n = Inf, simplify = TRUE)[,2],
-    str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4])
+   rownames(matrix) &lt;- paste(
+    str_replace(str_split(mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,1], &quot;\\s*\\[[^\\)]+\\]&quot;, &quot;&quot;),
+     mdata$row_info[,&#39;protein_name&#39;],
+       #str_split(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,2], &quot;\\.&quot;, n = Inf, simplify = TRUE)[,2],
+    str_replace(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4], &quot;M+\\d+;&quot;, &quot;&quot;))
   
   colnames(matrix) &lt;- colnames(mdata$data)
-  
-   # use viridis
-  pal &lt;- viridis::viridis_pal()
-  colours &lt;-  pal(11)
   
   # organise columns according to genotype and timepoints
   col_split = factor(stringr::str_split(colnames(matrix), &quot;-&quot;, n = 2, simplify = TRUE)[,1], levels = c(&quot;Guy11&quot;, &quot;dpmk1&quot;))
@@ -635,10 +674,10 @@ combine them for plotting at the end.</p>
     #height = grid::unit(5, &quot;cm&quot;),
     row_order = rownames(matrix), 
     show_row_names = TRUE,
-    row_names_side = &quot;left&quot;,
-    right_annotation = row_ha,
+    row_names_side = &quot;right&quot;,
+    left_annotation = row_ha,
     rect_gp = grid::gpar(col = &quot;white&quot;, lwd = 0.5 ), 
-    col = colours,
+    col = col_fun,
     show_heatmap_legend = FALSE,
     heatmap_legend_param = list(title = &quot;Scaled&quot;),
     column_names_gp = grid::gpar(fontsize = 8),
@@ -655,12 +694,13 @@ combine them for plotting at the end.</p>
   print(hm)
   dev.off()
 }</code></pre>
-<pre class="r"><code>ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]]
-
+<pre class="r"><code>ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]] 
+ 
 graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)
 pdf_filename = paste(graphics_dir, &quot;013-ms1-pathways.pdf&quot;, sep = &quot;/&quot;)
 pdf(file = pdf_filename, height = 12, width = 8.27)
 ComplexHeatmap::draw(ht_list)
+ComplexHeatmap::draw(lgd, x = grid::unit(18, &quot;cm&quot;), y = grid::unit(12, &quot;cm&quot;))
 dev.off()</code></pre>
 <pre><code>## quartz_off_screen 
 ##                 2</code></pre>

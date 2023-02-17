@@ -62,6 +62,25 @@ cleaned = read_csv(ms1_filepath)
 cleaned %>% filter(sample == "dpmk1" & time == 0)
 ```
 
+# Curation
+
+```{r}
+
+
+ms1_curated_filepath = paste0(here::here(), "/data/raw/013_curation/ms1_curated.csv")
+to_be_removed = read_csv(ms1_curated_filepath) %>% 
+  filter(KEEP == FALSE) 
+
+#head(to_be_removed$id)
+
+#head(to_be_removed)
+
+cleaned = cleaned %>%
+  mutate(id = paste(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, sep = "|")) %>%
+  filter(id %in% to_be_removed$id == FALSE) %>%
+  select(-id)
+```
+
 
 ### Build the matrix
 
@@ -230,6 +249,14 @@ ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG` %v% hm
 Here we draw all the heatmaps using the viridis colour palette and we combine them for plotting at the end.
 
 ```{r}
+# use viridis
+pal <- viridis::viridis_pal()
+colours <- pal(11)
+
+library(circlize)
+col_fun = colorRamp2(seq(0,1, by=0.1), colours)
+lgd = Legend(col_fun = col_fun, title = "Scaled\nabundance")
+
 for (p in unique(pathways$pathway)) {
   
   #print(p)
@@ -266,16 +293,13 @@ for (p in unique(pathways$pathway)) {
   # build a matrix to use the ComplexHeatmap package
   matrix <- mdata$data
 
-   rownames(matrix) <- paste(mdata$row_info[,'protein_name'],
-   str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,1] ,
+   rownames(matrix) <- paste(
+    str_replace(str_split(mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,1], "\\s*\\[[^\\)]+\\]", ""),
+     mdata$row_info[,'protein_name'],
        #str_split(str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,2], "\\.", n = Inf, simplify = TRUE)[,2],
-    str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,4])
+    str_replace(str_split( mdata$row_info[,'m_rownames'], "\\|", n = Inf, simplify = TRUE)[,4], "M+\\d+;", ""))
   
   colnames(matrix) <- colnames(mdata$data)
-  
-   # use viridis
-  pal <- viridis::viridis_pal()
-  colours <-  pal(11)
   
   # organise columns according to genotype and timepoints
   col_split = factor(stringr::str_split(colnames(matrix), "-", n = 2, simplify = TRUE)[,1], levels = c("Guy11", "dpmk1"))
@@ -294,10 +318,10 @@ for (p in unique(pathways$pathway)) {
     #height = grid::unit(5, "cm"),
     row_order = rownames(matrix), 
     show_row_names = TRUE,
-    row_names_side = "left",
-    right_annotation = row_ha,
+    row_names_side = "right",
+    left_annotation = row_ha,
     rect_gp = grid::gpar(col = "white", lwd = 0.5 ), 
-    col = colours,
+    col = col_fun,
     show_heatmap_legend = FALSE,
     heatmap_legend_param = list(title = "Scaled"),
     column_names_gp = grid::gpar(fontsize = 8),
@@ -318,12 +342,13 @@ for (p in unique(pathways$pathway)) {
 
 
 ```{r}
-ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]]
-
+ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]] 
+ 
 graphics_dir = paste(here(), "graphics", sep = "/")
 pdf_filename = paste(graphics_dir, "013-ms1-pathways.pdf", sep = "/")
 pdf(file = pdf_filename, height = 12, width = 8.27)
 ComplexHeatmap::draw(ht_list)
+ComplexHeatmap::draw(lgd, x = grid::unit(18, "cm"), y = grid::unit(12, "cm"))
 dev.off()
 ```
 
