@@ -653,7 +653,7 @@ for (p in unique(pathways$pathway)) {
     str_replace(str_split(mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,1], &quot;\\s*\\[[^\\)]+\\]&quot;, &quot;&quot;),
      mdata$row_info[,&#39;protein_name&#39;],
        #str_split(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,2], &quot;\\.&quot;, n = Inf, simplify = TRUE)[,2],
-    str_replace(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4], &quot;M+\\d+;&quot;, &quot;&quot;))
+    paste0(&quot;(&quot;, str_replace(str_split( mdata$row_info[,&#39;m_rownames&#39;], &quot;\\|&quot;, n = Inf, simplify = TRUE)[,4], &quot;M+\\d+;&quot;, &quot;&quot;), &quot;)&quot;))
   
   colnames(matrix) &lt;- colnames(mdata$data)
   
