@@ -13,15 +13,29 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Libraries
 
-```{r, message=FALSE}
+```{r load-libraries, message=FALSE}
 library(readr)
 library(stringr)
 library(dplyr)
+library(here)
+
+library(ggplot2)
 
 library(mogo)
 library(clusterProfiler)
 library(viridis)
 ```
+
+### Paths
+
+Let's set the paths to the directory containing the raw data and to the directory to which we will save our results. 
+
+```{r set-paths}
+raw_data_path = paste(here(), "data", "raw", sep = "/")
+result_path = paste(here(), "results", sep = "/")
+graphics_path = paste(here(), "graphics", sep = "/")
+```
+
 
 ## Cluster 1
 
@@ -68,7 +82,7 @@ dotplot(enrich1) +
 enrich1_df = as.data.frame(enrich1) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster1_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster1_go_enrichment.csv", sep = "/")
 write_csv(enrich1_df, csv_filename)
 ```
 
@@ -115,7 +129,7 @@ dotplot(enrich2) +
 enrich2_df = as.data.frame(enrich2) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster2_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster2_go_enrichment.csv", sep = "/")
 write_csv(enrich2_df, csv_filename)
 ```
 
@@ -157,7 +171,7 @@ dotplot(enrich3) + scale_colour_viridis(direction = -1)
 enrich3_df = as.data.frame(enrich3) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster3_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster3_go_enrichment.csv", sep = "/")
 write_csv(enrich3_df, csv_filename)
 ```
 
@@ -204,7 +218,7 @@ dotplot(enrich4) +
 enrich4_df = as.data.frame(enrich4) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster4_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster4_go_enrichment.csv", sep = "/")
 write_csv(enrich3_df, csv_filename)
 ```
 
@@ -251,7 +265,7 @@ dotplot(enrich5) +
 enrich5_df = as.data.frame(enrich5) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster5_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster5_go_enrichment.csv", sep = "/")
 write_csv(enrich5_df, csv_filename)
 ```
 
@@ -262,7 +276,10 @@ write_csv(enrich5_df, csv_filename)
 Read data from csv file.
 
 ```{r}
-targets = readxl::read_xlsx("Pmk1 direct targets PRM_101122.xlsx") %>% 
+
+data_filename = paste(raw_data_path, "Pmk1 direct targets PRM_101122.xlsx", sep = "/")
+
+targets = readxl::read_xlsx(data_filename) %>% 
   dplyr::select(`Phosphorylation position`) %>% unique()
 ```
 
@@ -321,8 +338,72 @@ dotplot(enrich_targets) +
 enrich_targets_df = as.data.frame(enrich_targets) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_targets_go_enrichment.csv"
+csv_filename = paste(result_path, "011_targets_go_enrichment.csv", sep = "/")
 write_csv(enrich_targets_df, csv_filename)
 ```
 
+
+# Summary
+
+February 2023: New request from Neftaly.
+
+Let's summarise all the go enrichement analysis in a single dot plot. 
+
+First, for all the dataframe build previously, we add a column with the cluster number (as categorial variable, not numerical).
+
+```{r}
+enrich1_df$cluster = "1"
+enrich2_df$cluster = "2"
+enrich3_df$cluster = "3"
+enrich4_df$cluster = "4"
+enrich5_df$cluster = "5"
+```
+
+Now we can bind all these data frames together.
+
+```{r}
+enrichment_summary_df = rbind(enrich1_df, enrich2_df, 
+  enrich3_df, enrich4_df, enrich5_df)
+```
+
+We transform the current gene ratio (50/100) to its numerical value (0.5).
+
+```{r}
+enrichment_summary_df = enrichment_summary_df |> mutate(
+  gene.ratio = sapply(strsplit(enrichment_summary_df$GeneRatio, "/"), 
+    function(x) as.numeric(x[1])/as.numeric(x[2]))) 
+```
+
+We draw th plot
+
+```{r}
+ggplot(enrichment_summary_df,
+  aes(x = cluster, y = Description, size = gene.ratio, colour = p.adjust)) + 
+  geom_point()
+```
+```{r}
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
+
+```
+
+Sort out these GO terms!
+
+```{r}
+library(GO.db)
+
+ontology = unlist(Ontology(GOTERM))
+enrichment_summary_df$ont = ontology[enrichment_summary_df$ID]
+
+enrichment_summary_df = enrichment_summary_df |> mutate(
+  labels = paste0(Description, " (", ID, ")")
+  ) 
+
+ggplot(enrichment_summary_df,
+  aes(x = cluster, y = labels, size = gene.ratio, colour = p.adjust)) + 
+  geom_point() + facet_grid(ont~., scales = "free", space = "free")
+
+```
 

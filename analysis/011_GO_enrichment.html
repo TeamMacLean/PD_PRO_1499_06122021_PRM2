@@ -364,10 +364,15 @@ display: none;
 <pre class="r"><code>library(readr)
 library(stringr)
 library(dplyr)
+library(here)
 
 library(mogo)
 library(clusterProfiler)
 library(viridis)</code></pre>
+</div>
+<div id="results" class="section level3">
+<h3>Results</h3>
+<pre class="r"><code>result_path = paste(here(), &quot;results&quot;, sep = &quot;/&quot;)</code></pre>
 </div>
 </div>
 <div id="cluster-1" class="section level2">
@@ -412,7 +417,7 @@ associated with this transcript/gene identifier.</p>
 <pre class="r"><code>enrich1_df = as.data.frame(enrich1) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_cluster1_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_cluster1_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich1_df, csv_filename)</code></pre>
 </div>
 </div>
@@ -445,7 +450,7 @@ write_csv(enrich1_df, csv_filename)</code></pre>
 <pre class="r"><code>enrich2_df = as.data.frame(enrich2) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_cluster2_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_cluster2_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich2_df, csv_filename)</code></pre>
 </div>
 </div>
@@ -473,7 +478,7 @@ write_csv(enrich2_df, csv_filename)</code></pre>
 <pre class="r"><code>enrich3_df = as.data.frame(enrich3) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_cluster3_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_cluster3_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich3_df, csv_filename)</code></pre>
 </div>
 </div>
@@ -506,7 +511,7 @@ write_csv(enrich3_df, csv_filename)</code></pre>
 <pre class="r"><code>enrich4_df = as.data.frame(enrich4) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_cluster4_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_cluster4_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich3_df, csv_filename)</code></pre>
 </div>
 </div>
@@ -539,7 +544,7 @@ write_csv(enrich3_df, csv_filename)</code></pre>
 <pre class="r"><code>enrich5_df = as.data.frame(enrich5) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_cluster5_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_cluster5_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich5_df, csv_filename)</code></pre>
 </div>
 </div>
@@ -548,13 +553,13 @@ write_csv(enrich5_df, csv_filename)</code></pre>
 <div id="load-data-5" class="section level3">
 <h3>Load data</h3>
 <p>Read data from csv file.</p>
-<pre class="r"><code>#targets = readxl::read_xlsx(&quot;Pmk1 direct targets PRM_101122.xlsx&quot;) %&gt;% 
-#  dplyr::select(`Pmk1 direct targets (Frank&amp;Nef)`) %&gt;% unique()
+<pre class="r"><code>data_path = paste(here(), &quot;data&quot;, &quot;raw&quot;, sep = &quot;/&quot;)
+data_filename = paste(data_path, &quot;Pmk1 direct targets PRM_101122.xlsx&quot;, sep = &quot;/&quot;)
 
-targets = readxl::read_xlsx(&quot;Pmk1 direct targets PRM_101122.xlsx&quot;) %&gt;% 
+targets = readxl::read_xlsx(data_filename) %&gt;% 
   dplyr::select(`Phosphorylation position`) %&gt;% unique()</code></pre>
-<p>Keep only the gene id (for now I remove gi number) Replacement:
-gi|145610929|ref|XP_368444.2| MST7 = MGG_00800
+<p>Keep only the gene id (for now I remove gi number) Replacement:</p>
+<p>gi|145610929|ref|XP_368444.2| MST7 = MGG_00800
 gi|39964959|ref|XP_365053.1| MAC1 (S75) = MGG_09898</p>
 <pre class="r"><code>targets2 = targets %&gt;% 
   dplyr::mutate(gene_ids = 
@@ -563,9 +568,15 @@ gi|39964959|ref|XP_365053.1| MAC1 (S75) = MGG_09898</p>
     &#39;MGG_00800&#39;, gene_ids)) %&gt;%
   dplyr::mutate(gene_ids = ifelse(`gene_ids` == &#39;gi|39964959|ref|XP_365053.1|&#39;, 
     &#39;MGG_09898&#39;, gene_ids))</code></pre>
-<pre class="r"><code>#gene_ids = targets %&gt;% dplyr::mutate(gene_ids = stringr::str_split(`Pmk1 direct targets (Frank&amp;Nef)`, &quot; &quot;, n = 2, simplify = TRUE)[,1]) %&gt;% dplyr::filter(str_detect(gene_ids, &quot;^MGG&quot;)) %&gt;% unique() %&gt;% dplyr::select(gene_ids)
-
-gene_ids = targets2 %&gt;% dplyr::mutate(gene_ids = stringr::str_split(`Phosphorylation position`, &quot; &quot;, n = 2, simplify = TRUE)[,1]) %&gt;% dplyr::filter(str_detect(gene_ids, &quot;^MGG&quot;)) %&gt;% dplyr::select(gene_ids)  %&gt;% unique()</code></pre>
+<p>In several cases, few selected peptides correspond to the same
+protein and thus the different lines/rows (peptides) are collapsed so
+that a single MGG number (gene/protein) is taken into consideration in
+the GO enrichment analysis resulting in a list of 31 proteins.</p>
+<pre class="r"><code>gene_ids = targets2 %&gt;% 
+  dplyr::mutate(gene_ids = stringr::str_split(`Phosphorylation position`, &quot; &quot;, n = 2, simplify = TRUE)[,1]) %&gt;% 
+  dplyr::filter(str_detect(gene_ids, &quot;^MGG&quot;)) %&gt;% 
+  dplyr::select(gene_ids)  %&gt;% 
+  unique()</code></pre>
 </div>
 <div id="go-enrichment-5" class="section level3">
 <h3>GO Enrichment</h3>
@@ -586,7 +597,7 @@ dotplot(enrich_targets) +
 <pre class="r"><code>enrich_targets_df = as.data.frame(enrich_targets) %&gt;%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = &quot;011_targets_go_enrichment.csv&quot;
+csv_filename = paste(result_path, &quot;011_targets_go_enrichment.csv&quot;, sep = &quot;/&quot;)
 write_csv(enrich_targets_df, csv_filename)</code></pre>
 </div>
 </div>
