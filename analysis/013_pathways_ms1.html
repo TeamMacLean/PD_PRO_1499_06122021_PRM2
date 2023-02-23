@@ -11,7 +11,7 @@
 
 <meta name="author" content="Clara Jégousse" />
 
-<meta name="date" content="2023-02-17" />
+<meta name="date" content="2023-02-23" />
 
 <title>Pathways in MS1</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Pathways in MS1</h1>
 <h4 class="author">Clara Jégousse</h4>
-<h4 class="date">2023-02-17</h4>
+<h4 class="date">2023-02-23</h4>
 
 </div>
 
@@ -374,8 +374,10 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(openxlsx)
 
 library(ComplexHeatmap)</code></pre>
+<pre class="r"><code>results_dir = paste(here(), &quot;results&quot;, sep = &quot;/&quot;)</code></pre>
 </div>
 <div id="load-the-data" class="section level1">
 <h1>Load the data</h1>
@@ -623,6 +625,11 @@ for (p in unique(pathways$pathway)) {
   # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
   selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse=&quot;|&quot;), ms1_tb$id),]
   
+  
+  xlsx_filename = paste0(results_dir, &quot;/&quot;, &quot;013-ms1-pathways-&quot;, p, &quot;.xlsx&quot;)
+  write.xlsx(as.data.frame(selected_ms1), 
+    xlsx_filename, keepNA = TRUE, rowNames = TRUE)
+  
   # store the row information (peptide and gene identifiers)
   row_infos = data.frame(m_rownames = rownames(selected_ms1))
   
@@ -694,6 +701,9 @@ for (p in unique(pathways$pathway)) {
   print(hm)
   dev.off()
 }</code></pre>
+<pre><code>## Warning in file.create(to[okay]): cannot create file
+## &#39;/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/013-ms1-pathways-Sln1/HOG.xlsx&#39;,
+## reason &#39;No such file or directory&#39;</code></pre>
 <pre class="r"><code>ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]] 
  
 graphics_dir = paste(here(), &quot;graphics&quot;, sep = &quot;/&quot;)

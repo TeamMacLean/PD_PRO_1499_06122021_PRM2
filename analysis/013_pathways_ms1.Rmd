@@ -23,8 +23,14 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 library(stringr)
+library(openxlsx)
 
 library(ComplexHeatmap)
+```
+
+
+```{r}
+results_dir = paste(here(), "results", sep = "/")
 ```
 
 
@@ -266,6 +272,11 @@ for (p in unique(pathways$pathway)) {
   
   # filter out the MS1 scaled abundance values for the proteins (peptides) involved in the selected_pathway
   selected_ms1 = m[grepl(paste(selected_pathway$id_number, collapse="|"), ms1_tb$id),]
+  
+  
+  xlsx_filename = paste0(results_dir, "/", "013-ms1-pathways-", p, ".xlsx")
+  write.xlsx(as.data.frame(selected_ms1), 
+    xlsx_filename, keepNA = TRUE, rowNames = TRUE)
   
   # store the row information (peptide and gene identifiers)
   row_infos = data.frame(m_rownames = rownames(selected_ms1))
