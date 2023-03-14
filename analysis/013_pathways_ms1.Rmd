@@ -68,18 +68,16 @@ cleaned = read_csv(ms1_filepath)
 cleaned %>% filter(sample == "dpmk1" & time == 0)
 ```
 
-# Curation
+### Curation
+
+Remove the list of peptides identified by Frank Menke.
+
 
 ```{r}
-
-
-ms1_curated_filepath = paste0(here::here(), "/data/raw/013_curation/ms1_curated.csv")
-to_be_removed = read_csv(ms1_curated_filepath) %>% 
-  filter(KEEP == FALSE) 
+ms1_curated_filepath = paste0(here::here(), "/data/curated/013_curation_v3/ms1_id_to_remove.csv")
+to_be_removed = read_csv(ms1_curated_filepath) 
 
 #head(to_be_removed$id)
-
-#head(to_be_removed)
 
 cleaned = cleaned %>%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, sep = "|")) %>%
@@ -109,6 +107,7 @@ raw_m <- as.matrix(m)
 ```
 
 
+
 ### Labels
 
 ```{r}
@@ -127,7 +126,6 @@ raw %>%
   str_replace(., "2xPhospho ", "")) %>%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`,  sep = "-")) %>%
   select(id, modif_position_label)
-
 ```
 
 

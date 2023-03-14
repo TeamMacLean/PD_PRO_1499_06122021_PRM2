@@ -28,14 +28,13 @@ library(viridis)
 
 ### Paths
 
-Let's set the paths to the directory containing the raw data and to the directory to which we will save our results. 
+Let's set the paths to the directory containing the raw data and to the directory to which we will save our results.
 
 ```{r set-paths}
 raw_data_path = paste(here(), "data", "raw", sep = "/")
 result_path = paste(here(), "results", sep = "/")
 graphics_path = paste(here(), "graphics", sep = "/")
 ```
-
 
 ## Cluster 1
 
@@ -76,7 +75,7 @@ dotplot(enrich1) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich1_df = as.data.frame(enrich1) %>%
@@ -123,7 +122,7 @@ dotplot(enrich2) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich2_df = as.data.frame(enrich2) %>%
@@ -165,7 +164,7 @@ barplot(enrich3) + scale_fill_viridis(direction = -1) + ggplot2::theme(aspect.ra
 dotplot(enrich3) + scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich3_df = as.data.frame(enrich3) %>%
@@ -212,7 +211,7 @@ dotplot(enrich4) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich4_df = as.data.frame(enrich4) %>%
@@ -259,7 +258,7 @@ dotplot(enrich5) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich5_df = as.data.frame(enrich5) %>%
@@ -283,12 +282,9 @@ targets = readxl::read_xlsx(data_filename) %>%
   dplyr::select(`Phosphorylation position`) %>% unique()
 ```
 
-Keep only the gene id (for now I remove gi number)
-Replacement:
+Keep only the gene id (for now I remove gi number) Replacement:
 
-gi|145610929|ref|XP_368444.2| MST7  = MGG_00800
-gi|39964959|ref|XP_365053.1| MAC1 (S75) = MGG_09898
-
+gi\|145610929\|ref\|XP_368444.2\| MST7 = MGG_00800 gi\|39964959\|ref\|XP_365053.1\| MAC1 (S75) = MGG_09898
 
 ```{r}
 targets2 = targets %>% 
@@ -316,7 +312,6 @@ gene_ids = targets2 %>%
 enrich_targets <- do_enrich(gene_ids$gene_ids)
 ```
 
-
 ```{r, message=FALSE}
 barplot(enrich_targets) + 
   #scale_fill_viridis(direction = -1) + 
@@ -332,7 +327,7 @@ dotplot(enrich_targets) +
 # limits and directions are set so that the more intense the colour is, more smaller/better the p-value is
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich_targets_df = as.data.frame(enrich_targets) %>%
@@ -342,12 +337,11 @@ csv_filename = paste(result_path, "011_targets_go_enrichment.csv", sep = "/")
 write_csv(enrich_targets_df, csv_filename)
 ```
 
-
 # Summary
 
 February 2023: New request from Neftaly.
 
-Let's summarise all the go enrichement analysis in a single dot plot. 
+Let's summarise all the go enrichement analysis in a single dot plot.
 
 First, for all the dataframe build previously, we add a column with the cluster number (as categorial variable, not numerical).
 
@@ -381,6 +375,7 @@ ggplot(enrichment_summary_df,
   aes(x = cluster, y = Description, size = gene.ratio, colour = p.adjust)) + 
   geom_point()
 ```
+
 ```{r}
 
 plot_filename = paste(graphics_path, "011-go-enrichment-summary.pdf", sep = "/")
@@ -393,6 +388,7 @@ Sort out these GO terms!
 
 ```{r}
 library(GO.db)
+library(viridis)
 
 ontology = unlist(Ontology(GOTERM))
 enrichment_summary_df$ont = ontology[enrichment_summary_df$ID]
@@ -403,7 +399,51 @@ enrichment_summary_df = enrichment_summary_df |> mutate(
 
 ggplot(enrichment_summary_df,
   aes(x = cluster, y = labels, size = gene.ratio, colour = p.adjust)) + 
+  #scale_color_viridis(direction = -1) +
   geom_point() + facet_grid(ont~., scales = "free", space = "free")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v1.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
 
 ```
 
+What are these GO terms that are displayed as "NA".
+
+-   [GO:0007184](https://www.ebi.ac.uk/QuickGO/term/GO:0004871#:~:text=Definition%20(GO%3A0004871%20GONUTS%20page)&text=Conveys%20a%20signal%20across%20a,order%20to%20trigger%20a%20response.){.uri}: OBSOLETE. Obsolete signal transducer activity \>\> This term was obsoleted because it was not clearly defined and is not a useful grouping term.
+-   [GO:1990939](https://www.ebi.ac.uk/QuickGO/term/GO:1990939): this is a secondary identifier, within "**Molecular Function",** primary id is <GO:0003777>.
+
+After discussion with Neftaly, we will remove the obsolete term and move the ATP-dependant microtubule to MF:
+
+```{r}
+cleaned_enrichment_summary_df = enrichment_summary_df %>%
+  filter(labels != "obsolete signal transducer activity (GO:0004871)") %>%
+  mutate(ont = ifelse(labels == "ATP-dependent microtubule motor activity (GO:1990939)", "MF", ont))
+```
+
+```{r}
+ggplot(cleaned_enrichment_summary_df,
+  aes(x = cluster, y = labels, size = gene.ratio, colour = p.adjust)) + 
+  scale_color_viridis(direction = -1) +
+  geom_point() + 
+  facet_grid(ont~., scales = "free", space = "free")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v2.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 7, height = 10)
+```
+
+```{r}
+ggplot(enrichment_summary_df,
+  aes(
+    #x = cluster,
+    x = ordered(cluster, levels = c("5", "4", "3", "2", "1")), 
+    y = labels, size = gene.ratio, colour = p.adjust)) + 
+  scale_color_viridis(option = "B", direction = -1) +
+  geom_point() + facet_grid(~ont, scales = "free", space = "free") +
+ coord_flip() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + labs(x = "clusters")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v3.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
+```

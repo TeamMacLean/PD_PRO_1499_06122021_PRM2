@@ -308,7 +308,8 @@ row_ha = ComplexHeatmap::rowAnnotation(selected_targets = selected_targets$selec
   show_legend = FALSE, 
   annotation_label = "targets",
   annotation_name_gp= grid::gpar(fontsize = 8),
-  gp = grid::gpar(col = "black", lwd = 1)
+  #gp = grid::gpar(col = "black", lwd = 1)
+  gp = grid::gpar(col = "white", lwd = 1)
   )
 ```
 
@@ -376,6 +377,15 @@ prm_selected_targets
 # export as PDF A4 portrait
 ```
 
+```{r}
+graphics_path = paste(here::here(), "graphics", sep = "/")
+plot_filename = paste(graphics_path, "007-prm_selected_targets.pdf", sep = "/")
+
+pdf(plot_filename, paper="a4")
+ComplexHeatmap::draw(prm_selected_targets)
+dev.off()
+```
+
 # Heatmap of the 68 selected targets ONLY
 
 Subset the selected targets from the matrix
@@ -441,9 +451,11 @@ prm_selected_targets_only
 
 # Bar plots
 
+## Selected peptides
+
 The objective is to reproduce the barplots that were created by Bozeng to compare the log FC between conditions/treaments (time points; mutant vs. wild type) for each selected 'target' peptide.
 
-## Prepare data table
+### Prepare data table
 
 Make a tibble `select_sig_fc_tb` from the matrix of selected targets `select_sig_fc_mat` and converting GI numbers to MGG numbers.
 
@@ -468,7 +480,7 @@ select_sig_fc_tb_melted = select_sig_fc_tb %>%
   dplyr::select(gene_id, treatment, time, FC)
 ```
 
-## Draw the bar plots
+### Draw the bar plots
 
 Set colours from the same "red-blue" palette as the heatmap for consistency
 
@@ -493,9 +505,98 @@ ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)
 Save the plots.
 
 ```{r}
-graphics_dir = paste(here(), "graphics", sep = "/")
+graphics_dir = paste(here::here(), "graphics", sep = "/")
 pdf_filename = paste(graphics_dir, "007-prm-68-selected-pep-barplots.pdf", sep = "/")
 pdf(file = pdf_filename, width = 16, height = 9)
 last_plot()
 dev.off()
+```
+
+## Experimentally validated peptides
+
+### Prepare the data table
+
+Load the list of peptides with experimental data in the literature according to Neftaly.
+
+```{r}
+exp_peptides_filepath = paste0(here::here(), "/data/raw/Experimentally validated phosphorylation sites in appressorium.xlsx")
+exp_peptides_data = readxl::read_xlsx(exp_peptides_filepath)
+```
+
+Find this peptides in the matrix of peptides with significantly different fold changes.
+
+```{r}
+exp_targets = data.frame(
+  id = rownames(sig_fc_mat) %>% as.vector(),
+  selected = stringr::str_split(rownames(sig_fc_mat), " ", simplify = TRUE, n = 2)[,1] %in% exp_peptides_data$`Gene ID`)
+```
+
+Out of the 17 peptides with experimental data in the literature, only 9 are in the matrix.
+
+```{r}
+exp_targets_in_sig_fc_mat = exp_targets %>% dplyr::filter(selected == TRUE) %>% 
+  dplyr::mutate(gene_id = stringr::str_split(id, " ", simplify = TRUE, n = 2)[,1]) %>% 
+  dplyr::select(gene_id)
+
+exp_targets_in_sig_fc_mat %>% unique() %>% dim()
+```
+
+List the peptides with experimental data in the literature that are NOT in the matrix
+
+```{r}
+exp_peptides_data %>%
+  dplyr::filter(`Gene ID` %in% exp_targets_in_sig_fc_mat$gene_id == FALSE)
+```
+
+Subset the matrix to keep only the peptides with experimental data.
+
+```{r}
+selection = exp_targets %>% dplyr::filter(selected == TRUE) %>% dplyr::select(id)
+select_sig_fc_mat = sig_fc_mat[selection$id,]
+```
+
+```{r}
+select_sig_fc_tb = select_sig_fc_mat %>% 
+  dplyr::as_tibble() %>% 
+  dplyr::mutate(gene_id = rownames(select_sig_fc_mat)) 
+```
+
+Melt the matrix into a dataframe
+
+```{r}
+select_sig_fc_tb_melted = select_sig_fc_tb %>% 
+  tidyr::pivot_longer(cols = `Guy11_1-Guy11_0`:`dpmk1_6-dpmk1_0`, 
+    values_to = "FC", names_to = "comparison") %>%
+  tidyr::separate(comparison, c("treatment", "misc"), "_") %>%
+  tidyr::separate(misc, c("time", "misc1"), "-") %>%
+  dplyr::mutate(gene_id =  stringr::str_replace(gene_id, '\\) ', '\\)\n')) %>%
+  dplyr::select(gene_id, treatment, time, FC)
+```
+
+### Draw the barplots
+
+Choose the colours
+
+```{r}
+chosen_red = RColorBrewer::brewer.pal(6, 'RdBu')[1]
+chosen_blue = RColorBrewer::brewer.pal(6, 'RdBu')[6]
+```
+
+Draw the plot
+
+```{r}
+ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)) + 
+  ggplot2::geom_bar(position="dodge", stat = "identity") + 
+  ggplot2::scale_fill_manual(values = c(chosen_red, chosen_blue), name = "", 
+    labels = c(expression(paste(Delta, "pmk1")), 'Guy11')) +
+  ggplot2::facet_wrap(~ gene_id, scales = "free") + 
+  ggplot2::theme_minimal() + 
+  ggplot2::theme(strip.text.x = element_text(size = 4))
+```
+
+```{r}
+graphics_path = paste(here::here(), "graphics", sep = "/")
+plot_filename = paste(graphics_path, "007-prm-pep-exp-validation-barplots.pdf", sep = "/")
+
+ggsave(plot_filename, plot = last_plot(), width = 11, height = 8)
 ```
