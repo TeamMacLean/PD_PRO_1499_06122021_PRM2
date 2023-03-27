@@ -35,4 +35,4 @@ Performed as described in the repo `.Rmd` using the tools previously developed i
   
   ## TODO
   
-  - [x] Re-organise directories for input files and output files >> project now contains directories for data, results, and graphics. 
+  - [x] ~~Re-organise directories for input files and output files~~ >> project now contains directories for data, results, and graphics. 
