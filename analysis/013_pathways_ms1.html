@@ -792,7 +792,7 @@ this MGG number, we display the barplot.</p>
      plot_list[[p]] = plot
   }
   
-  pdf_filename = here::here(&quot;graphics&quot;, paste0(&quot;013-ms1&quot;, g, &quot;-bar-plots.pdf&quot;))
+  pdf_filename = here::here(&quot;graphics&quot;, paste0(&quot;013-ms1-&quot;, g, &quot;-bar-plots.pdf&quot;))
   ggexport(plot_list, filename = pdf_filename,
     width = 6, height = 4)
 }</code></pre>

@@ -43,7 +43,7 @@ graphics_path = paste(here(), "graphics", sep = "/")
 Read data from csv file and select the transcript identifiers (e.g. `MGG_07200T0`).
 
 ```{r, message=FALSE}
-cluster1 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 1 _on_guy11_and_dpmk1.csv') %>% 
+cluster1 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 1 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -92,7 +92,7 @@ write_csv(enrich1_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster2 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 2 _on_guy11_and_dpmk1.csv') %>% 
+cluster2 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 2 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -139,7 +139,7 @@ write_csv(enrich2_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster3 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 3 _on_guy11_and_dpmk1.csv') %>% dplyr::select(id)
+cluster3 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 3 _on_guy11_and_dpmk1.csv') %>% dplyr::select(id)
 ```
 
 Keep only the gene id
@@ -181,7 +181,7 @@ write_csv(enrich3_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster4 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 4 _on_guy11_and_dpmk1.csv') %>% 
+cluster4 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 4 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -228,7 +228,7 @@ write_csv(enrich3_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster5 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 5 _on_guy11_and_dpmk1.csv') %>% 
+cluster5 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 5 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -343,7 +343,7 @@ February 2023: New request from Neftaly.
 
 Let's summarise all the go enrichement analysis in a single dot plot.
 
-First, for all the dataframe build previously, we add a column with the cluster number (as categorial variable, not numerical).
+First, for all the data frame build previously, we add a column with the cluster number (as categorial variable, not numerical).
 
 ```{r}
 enrich1_df$cluster = "1"

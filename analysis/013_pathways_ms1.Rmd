@@ -453,7 +453,7 @@ for(g in unique(ms1_data$short_gene_id %>% unique())){
      plot_list[[p]] = plot
   }
   
-  pdf_filename = here::here("graphics", paste0("013-ms1", g, "-bar-plots.pdf"))
+  pdf_filename = here::here("graphics", paste0("013-ms1-", g, "-bar-plots.pdf"))
   ggexport(plot_list, filename = pdf_filename,
     width = 6, height = 4)
 }
