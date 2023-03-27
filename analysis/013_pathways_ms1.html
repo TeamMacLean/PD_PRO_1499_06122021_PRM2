@@ -11,7 +11,7 @@
 
 <meta name="author" content="Clara Jégousse" />
 
-<meta name="date" content="2023-02-23" />
+<meta name="date" content="2023-03-27" />
 
 <title>Pathways in MS1</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">Pathways in MS1</h1>
 <h4 class="author">Clara Jégousse</h4>
-<h4 class="date">2023-02-23</h4>
+<h4 class="date">2023-03-27</h4>
 
 </div>
 
@@ -375,6 +375,9 @@ library(dplyr)
 library(tidyr)
 library(stringr)
 library(openxlsx)
+
+library(ggplot2)
+library(ggpubr)
 
 library(ComplexHeatmap)</code></pre>
 <pre class="r"><code>results_dir = paste(here(), &quot;results&quot;, sep = &quot;/&quot;)</code></pre>
@@ -399,6 +402,7 @@ pathways = read_xlsx(pathways_filepath)</code></pre>
 <div id="load-and-clean-the-data" class="section level3">
 <h3>Load and clean the data</h3>
 <pre class="r"><code>ms1_filepath = paste0(here::here(), &quot;/data/cleaned/ms1_cleaned.csv&quot;)
+
 cleaned = read_csv(ms1_filepath)</code></pre>
 <pre><code>## Rows: 79800 Columns: 8
 ## ── Column specification ────────────────────────────────────────────────────────
@@ -410,45 +414,42 @@ cleaned = read_csv(ms1_filepath)</code></pre>
 ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
 <pre class="r"><code>cleaned %&gt;% filter(sample == &quot;dpmk1&quot; &amp; time == 0)</code></pre>
 <pre><code>## # A tibble: 6,650 × 8
-##    Positions in Master Pro…¹ Modif…² Modif…³ Annot…⁴  time sample  value Label…⁵
-##    &lt;chr&gt;                     &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;   &lt;dbl&gt; &lt;chr&gt;   &lt;dbl&gt; &lt;chr&gt;  
-##  1 MGG_01819T0 [15-38]       MGG_01… 1xPhos… [R].RP…     0 dpmk1  5.30e8 S18    
-##  2 MGG_01819T0 [15-38]       &lt;NA&gt;    1xPhos… [R].RP…     0 dpmk1  5.30e8 S/T    
-##  3 MGG_01819T0 [15-38]       MGG_01… 1xPhos… [R].RP…     0 dpmk1  5.30e8 S17    
-##  4 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 S15; S…
-##  5 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 T16; S…
-##  6 MGG_00513T0 [13-32]       MGG_00… 2xPhos… [R].SN…     0 dpmk1  3.29e8 S15; T…
-##  7 MGG_00513T0 [11-32]       MGG_00… 3xPhos… [R].ER…     0 dpmk1  3.15e8 S21; S…
-##  8 MGG_00432T0 [1-23]        MGG_00… 1xMet-… [-].MS…     0 dpmk1  2.26e8 S10; S…
-##  9 MGG_00432T0 [1-23]        MGG_00… 1xMet-… [-].MS…     0 dpmk1  2.21e8 S10; S…
-## 10 MGG_00513T0 [13-32]       &lt;NA&gt;    1xPhos… [R].SN…     0 dpmk1  2.16e8 S/T    
-## # … with 6,640 more rows, and abbreviated variable names
-## #   ¹​`Positions in Master Proteins`, ²​`Modifications in Master Proteins`,
-## #   ³​Modifications, ⁴​`Annotated Sequence`,
-## #   ⁵​`Label Modifications in Master Proteins`</code></pre>
+##    `Positions in Master Proteins` Modifications in Master Protei…¹ Modifications
+##    &lt;chr&gt;                          &lt;chr&gt;                            &lt;chr&gt;        
+##  1 MGG_01819T0 [15-38]            MGG_01819T0 1xPhospho [S18(90.8… 1xPhospho [S…
+##  2 MGG_01819T0 [15-38]            &lt;NA&gt;                             1xPhospho [S…
+##  3 MGG_01819T0 [15-38]            MGG_01819T0 1xPhospho [S17(100)] 1xPhospho [S…
+##  4 MGG_00513T0 [13-32]            MGG_00513T0 2xPhospho [S15(84.2… 2xPhospho [S…
+##  5 MGG_00513T0 [13-32]            MGG_00513T0 2xPhospho [T16(97.8… 2xPhospho [T…
+##  6 MGG_00513T0 [13-32]            MGG_00513T0 2xPhospho [S15(91.4… 2xPhospho [S…
+##  7 MGG_00513T0 [11-32]            MGG_00513T0 3xPhospho [S21(92.9… 3xPhospho [S…
+##  8 MGG_00432T0 [1-23]             MGG_00432T0 2xPhospho [S10(99.9… 1xMet-loss […
+##  9 MGG_00432T0 [1-23]             MGG_00432T0 2xPhospho [S10(99.6… 1xMet-loss […
+## 10 MGG_00513T0 [13-32]            &lt;NA&gt;                             1xPhospho [S…
+## # ℹ 6,640 more rows
+## # ℹ abbreviated name: ¹​`Modifications in Master Proteins`
+## # ℹ 5 more variables: `Annotated Sequence` &lt;chr&gt;, time &lt;dbl&gt;, sample &lt;chr&gt;,
+## #   value &lt;dbl&gt;, `Label Modifications in Master Proteins` &lt;chr&gt;</code></pre>
 </div>
-</div>
-</div>
-<div id="curation" class="section level1">
-<h1>Curation</h1>
-<pre class="r"><code>ms1_curated_filepath = paste0(here::here(), &quot;/data/raw/013_curation/ms1_curated.csv&quot;)
-to_be_removed = read_csv(ms1_curated_filepath) %&gt;% 
-  filter(KEEP == FALSE) </code></pre>
-<pre><code>## Rows: 231 Columns: 17
+<div id="curation" class="section level3">
+<h3>Curation</h3>
+<p>Remove the list of peptides identified by Frank Menke.</p>
+<pre class="r"><code>ms1_curated_filepath = paste0(here::here(), &quot;/data/curated/013_curation_v3/ms1_id_to_remove.csv&quot;)
+to_be_removed = read_csv(ms1_curated_filepath) </code></pre>
+<pre><code>## Rows: 81 Columns: 1
 ## ── Column specification ────────────────────────────────────────────────────────
 ## Delimiter: &quot;,&quot;
-## chr (17): id, identifier, modification, KEEP, sequence, dpmk1-0, Guy11-0, dp...
+## chr (1): id
 ## 
 ## ℹ Use `spec()` to retrieve the full column specification for this data.
 ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.</code></pre>
 <pre class="r"><code>#head(to_be_removed$id)
 
-#head(to_be_removed)
-
 cleaned = cleaned %&gt;%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, sep = &quot;|&quot;)) %&gt;%
   filter(id %in% to_be_removed$id == FALSE) %&gt;%
-  select(-id)</code></pre>
+  dplyr::select(-id)</code></pre>
+</div>
 <div id="build-the-matrix" class="section level3">
 <h3>Build the matrix</h3>
 <p>The long dataframe needs pivot-ing into a matrix. Scaling is applied
@@ -459,7 +460,7 @@ too.</p>
            `Annotated Sequence`, `Modifications`, 
            `Label Modifications in Master Proteins`,  
            sep = &quot;|&quot;)) %&gt;%
-  select(id, sample_time, value) %&gt;%
+  dplyr::select(id, sample_time, value) %&gt;%
   pivot_wider(names_from = &quot;sample_time&quot;, values_from = &quot;value&quot; )
 
 m = ms1_tb
@@ -479,21 +480,21 @@ raw = read_excel(raw_filepath)</code></pre>
   str_replace(., &quot;1xPhospho &quot;, &quot;&quot;) %&gt;%
   str_replace(., &quot;2xPhospho &quot;, &quot;&quot;)) %&gt;%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`,  sep = &quot;-&quot;)) %&gt;%
-  select(id, modif_position_label)</code></pre>
+  dplyr::select(id, modif_position_label)</code></pre>
 <pre><code>## # A tibble: 6,650 × 2
-##    id                                                                    modif…¹
-##    &lt;chr&gt;                                                                 &lt;chr&gt;  
-##  1 MGG_01819T0 [15-38]-1xPhospho [S4(87.2)]                              S18    
-##  2 MGG_01819T0 [15-38]-1xPhospho [S/T]                                   &lt;NA&gt;   
-##  3 MGG_01819T0 [15-38]-1xPhospho [S3(86.6)]                              S17    
-##  4 MGG_00513T0 [13-32]-2xPhospho [S3(86.1); S9(75.2)]                    S15; S…
-##  5 MGG_00513T0 [13-32]-2xPhospho [T4(84.1); S9(93.8)]                    T16; S…
-##  6 MGG_00513T0 [13-32]-2xPhospho [S3(89.6); T4(75.8)]                    S15; T…
-##  7 MGG_00513T0 [11-32]-3xPhospho [S3(97.9); S/T]                         S21; S…
-##  8 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [T22(81.9); S/T]     S10; S…
-##  9 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [S10(99.9); S18(97.… S10; S…
-## 10 MGG_00513T0 [13-32]-1xPhospho [S/T]                                   &lt;NA&gt;   
-## # … with 6,640 more rows, and abbreviated variable name ¹​modif_position_label</code></pre>
+##    id                                                       modif_position_label
+##    &lt;chr&gt;                                                    &lt;chr&gt;               
+##  1 MGG_01819T0 [15-38]-1xPhospho [S4(87.2)]                 S18                 
+##  2 MGG_01819T0 [15-38]-1xPhospho [S/T]                      &lt;NA&gt;                
+##  3 MGG_01819T0 [15-38]-1xPhospho [S3(86.6)]                 S17                 
+##  4 MGG_00513T0 [13-32]-2xPhospho [S3(86.1); S9(75.2)]       S15; S21            
+##  5 MGG_00513T0 [13-32]-2xPhospho [T4(84.1); S9(93.8)]       T16; S21            
+##  6 MGG_00513T0 [13-32]-2xPhospho [S3(89.6); T4(75.8)]       S15; T16            
+##  7 MGG_00513T0 [11-32]-3xPhospho [S3(97.9); S/T]            S21; S/T            
+##  8 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [T22(8… S10; S/T            
+##  9 MGG_00432T0 [1-23]-1xMet-loss [N-Term];2xPhospho [S10(9… S10; S18            
+## 10 MGG_00513T0 [13-32]-1xPhospho [S/T]                      &lt;NA&gt;                
+## # ℹ 6,640 more rows</code></pre>
 </div>
 <div id="replace-missing-values" class="section level3">
 <h3>Replace missing values</h3>
@@ -512,7 +513,8 @@ m[is.na(m)] &lt;- min(m, na.rm=TRUE)</code></pre>
 <pre class="r"><code>rownames(m_scaled) = ms1_tb$id</code></pre>
 <p>Check the dimensions of our matrix</p>
 <pre class="r"><code>dim(m_scaled)</code></pre>
-<pre><code>## [1] 6597   12</code></pre>
+<pre><code>## [1] 6576   12</code></pre>
+</div>
 </div>
 </div>
 <div id="heatmaps" class="section level1">
@@ -724,6 +726,77 @@ pdf_filename = paste(graphics_dir, &quot;013-ms1-pathways-steve.pdf&quot;, sep =
 pdf(file = pdf_filename, height = 4, width = 10)
 hm_list[[8]]
 dev.off()</code></pre>
+</div>
+<div id="experimentally-validated-peptides" class="section level1">
+<h1>Experimentally validated peptides</h1>
+<div id="section" class="section level2">
+<h2></h2>
+<p>Load the list of peptides with experimental data in the literature
+according to Neftaly.</p>
+<pre class="r"><code>exp_peptides_filepath = paste0(here::here(), &quot;/data/raw/Experimentally validated phosphorylation sites in appressorium.xlsx&quot;) 
+
+exp_peptides_data = readxl::read_xlsx(exp_peptides_filepath)</code></pre>
+</div>
+<div id="prepare-the-data-table" class="section level2">
+<h2>Prepare the data table</h2>
+<p>We create a data frame from the matrix of scale abundance values
+<code>m_scaled</code>.</p>
+<pre class="r"><code>ms1_df = m_scaled %&gt;% as.data.frame() %&gt;% 
+  mutate(col = rownames(.)) %&gt;%
+  tidyr::separate(col, into = c(&quot;protein&quot;, &quot;sequence&quot;, &quot;modification&quot;, &quot;aa&quot;), sep = &quot;\\|&quot;) %&gt;%
+   pivot_longer(., cols = &quot;dpmk1-0&quot;:&quot;Guy11-6&quot;) %&gt;%
+  tidyr::separate(name, into = c(&quot;genotype&quot;, &quot;timepoint&quot;), sep = &quot;-&quot;) %&gt;%
+  tidyr::separate(protein, into = c(&quot;gene_id&quot;, &quot;pos&quot;), sep = &quot; &quot;) %&gt;%
+  mutate(short_gene_id = str_remove(gene_id, &quot;T0&quot;))</code></pre>
+</div>
+<div id="filter-selected-peptides" class="section level2">
+<h2>Filter selected peptides</h2>
+<p>We filter the selected peptides (peptides identified from the
+literature)</p>
+<pre class="r"><code>ms1_data = ms1_df %&gt;%
+  filter(short_gene_id %in% exp_peptides_data$`Gene ID`)</code></pre>
+</div>
+<div id="plots" class="section level2">
+<h2>Plots</h2>
+<p>For each gene id (MGG number), we select the scaled abundance value
+as a data frame <code>df</code> and for each peptide corresponding to
+this MGG number, we display the barplot.</p>
+<pre class="r"><code>for(g in unique(ms1_data$short_gene_id %&gt;% unique())){
+  #print(g)
+  
+  plot_list = list()
+  
+  df = ms1_data %&gt;% filter(short_gene_id == g) %&gt;%
+    mutate(genotype = factor(genotype, levels = c(&#39;Guy11&#39;, &#39;dpmk1&#39;)))
+  
+  for(p in unique(df$sequence)){
+    # print(p)
+    
+    plot = df %&gt;% filter(sequence == p) %&gt;%
+    ggplot(.) +
+    geom_col(aes(x = as.factor(timepoint), 
+     y = value, 
+     fill = genotype), 
+    position = &quot;dodge&quot;) +
+      labs(title = g, 
+        subtitle = paste(p), 
+        x = &quot;time&quot;,
+        y = &quot;scaled abundance&quot;) +
+      lims(y = c(0,1)) +
+      scale_fill_manual(values = c(&quot;#FDE725FF&quot;, &quot;#414487FF&quot;),
+        name = &#39;Genotypes&#39;,
+        labels = c(&#39;Guy11&#39;, expression(paste(Delta, &quot;pmk1&quot;)))) +
+      theme_classic() + 
+      theme(aspect.ratio = 1)
+    
+     plot_list[[p]] = plot
+  }
+  
+  pdf_filename = here::here(&quot;graphics&quot;, paste0(&quot;013-ms1&quot;, g, &quot;-bar-plots.pdf&quot;))
+  ggexport(plot_list, filename = pdf_filename,
+    width = 6, height = 4)
+}</code></pre>
+</div>
 </div>
 
 

@@ -3,16 +3,21 @@ title: "Pathways in MS1"
 author: "Clara Jégousse"
 date: "`r Sys.Date()`"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
-
 
 # Objectives
 
 According to Neftaly, the objectives are:
 
-To retrieve the phosphorylation values (scaled abundance) of phosphopeptides found for all of these proteins in the MS1 dataset at all time points.
+To retrieve the phosphorylation values (scaled abundance) of
+phosphopeptides found for all of these proteins in the MS1 dataset at
+all time points.
 
-To plot small heatmaps for each pathway with all the phosphopeptides found for their proteins in the strains Guy11 and Dpmk1
+To plot small heatmaps for each pathway with all the phosphopeptides
+found for their proteins in the strains Guy11 and Dpmk1
 
 # Libraries
 
@@ -25,14 +30,15 @@ library(tidyr)
 library(stringr)
 library(openxlsx)
 
+library(ggplot2)
+library(ggpubr)
+
 library(ComplexHeatmap)
 ```
-
 
 ```{r}
 results_dir = paste(here(), "results", sep = "/")
 ```
-
 
 # Load the data
 
@@ -53,14 +59,13 @@ unique(pathways$pathway) %>% length()
 unique(pathways$id_number) %>% length()
 ```
 
-
 ## MS1 data
-
 
 ### Load and clean the data
 
 ```{r}
 ms1_filepath = paste0(here::here(), "/data/cleaned/ms1_cleaned.csv")
+
 cleaned = read_csv(ms1_filepath)
 ```
 
@@ -72,7 +77,6 @@ cleaned %>% filter(sample == "dpmk1" & time == 0)
 
 Remove the list of peptides identified by Frank Menke.
 
-
 ```{r}
 ms1_curated_filepath = paste0(here::here(), "/data/curated/013_curation_v3/ms1_id_to_remove.csv")
 to_be_removed = read_csv(ms1_curated_filepath) 
@@ -82,13 +86,13 @@ to_be_removed = read_csv(ms1_curated_filepath)
 cleaned = cleaned %>%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, sep = "|")) %>%
   filter(id %in% to_be_removed$id == FALSE) %>%
-  select(-id)
+  dplyr::select(-id)
 ```
-
 
 ### Build the matrix
 
-The long dataframe needs pivot-ing into a matrix. Scaling is applied too. 
+The long dataframe needs pivot-ing into a matrix. Scaling is applied
+too.
 
 ```{r}
 ms1_tb <- cleaned %>%
@@ -97,7 +101,7 @@ ms1_tb <- cleaned %>%
            `Annotated Sequence`, `Modifications`, 
            `Label Modifications in Master Proteins`,  
            sep = "|")) %>%
-  select(id, sample_time, value) %>%
+  dplyr::select(id, sample_time, value) %>%
   pivot_wider(names_from = "sample_time", values_from = "value" )
 
 m = ms1_tb
@@ -106,15 +110,12 @@ m$id <- NULL
 raw_m <- as.matrix(m)
 ```
 
-
-
 ### Labels
 
 ```{r}
 raw_filepath = paste0(here::here(), "/data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx")
 raw = read_excel(raw_filepath)
 ```
-
 
 ```{r}
 raw %>% 
@@ -125,13 +126,13 @@ raw %>%
   str_replace(., "1xPhospho ", "") %>%
   str_replace(., "2xPhospho ", "")) %>%
   mutate(id = paste(`Positions in Master Proteins`, `Modifications`,  sep = "-")) %>%
-  select(id, modif_position_label)
+  dplyr::select(id, modif_position_label)
 ```
-
 
 ### Replace missing values
 
-We can also replace NA with the minimum observed value on the whole abundance data - before scaling and distance measuring.
+We can also replace NA with the minimum observed value on the whole
+abundance data - before scaling and distance measuring.
 
 ```{r}
 m <- raw_m
@@ -165,7 +166,8 @@ We create an empty heatmap list that will store all the heatmaps:
 hm_list = list()
 ```
 
-We set a colour scheme matching the original Excel document in which each pathway correspond to one colour:
+We set a colour scheme matching the original Excel document in which
+each pathway correspond to one colour:
 
 ```{r}
 pathway_colours = c(
@@ -242,7 +244,6 @@ for (p in unique(pathways$pathway)) {
 }
 ```
 
-
 ```{r,include=FALSE}
 #Plot all the heatmap together
 ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG` %v% hm_list$`Septin-oligomerisation` %v% hm_list$Vast %v% hm_list$Autophagy)
@@ -250,7 +251,8 @@ ComplexHeatmap::draw(hm_list$CpkA %v% hm_list$pmk1 %v% hm_list$`Sln1/HOG` %v% hm
 
 # Single heatmap
 
-Here we draw all the heatmaps using the viridis colour palette and we combine them for plotting at the end.
+Here we draw all the heatmaps using the viridis colour palette and we
+combine them for plotting at the end.
 
 ```{r}
 # use viridis
@@ -349,7 +351,6 @@ for (p in unique(pathways$pathway)) {
 }
 ```
 
-
 ```{r}
 ht_list = hm_list[[1]] %v% hm_list[[2]] %v% hm_list[[3]] %v% hm_list[[4]] %v% hm_list[[5]] %v% hm_list[[6]] %v% hm_list[[7]] 
  
@@ -361,10 +362,10 @@ ComplexHeatmap::draw(lgd, x = grid::unit(18, "cm"), y = grid::unit(12, "cm"))
 dev.off()
 ```
 
-
 # Steve proteins
 
-For a collaborator interested in knowing the phosphorylation of the proteins he is working with (Steve proteins)
+For a collaborator interested in knowing the phosphorylation of the
+proteins he is working with (Steve proteins)
 
 ```{r, eval=FALSE}
 graphics_dir = paste(here(), "graphics", sep = "/")
@@ -374,3 +375,86 @@ hm_list[[8]]
 dev.off()
 ```
 
+# Experimentally validated peptides
+
+## 
+
+Load the list of peptides with experimental data in the literature
+according to Neftaly.
+
+```{r}
+exp_peptides_filepath = paste0(here::here(), "/data/raw/Experimentally validated phosphorylation sites in appressorium.xlsx") 
+
+exp_peptides_data = readxl::read_xlsx(exp_peptides_filepath)
+```
+
+## Prepare the data table
+
+We create a data frame from the matrix of scale abundance values
+`m_scaled`.
+
+```{r, warning=FALSE}
+ms1_df = m_scaled %>% as.data.frame() %>% 
+  mutate(col = rownames(.)) %>%
+  tidyr::separate(col, into = c("protein", "sequence", "modification", "aa"), sep = "\\|") %>%
+   pivot_longer(., cols = "dpmk1-0":"Guy11-6") %>%
+  tidyr::separate(name, into = c("genotype", "timepoint"), sep = "-") %>%
+  tidyr::separate(protein, into = c("gene_id", "pos"), sep = " ") %>%
+  mutate(short_gene_id = str_remove(gene_id, "T0"))
+  
+  
+```
+
+## Filter selected peptides
+
+We filter the selected peptides (peptides identified from the
+literature)
+
+```{r}
+ms1_data = ms1_df %>%
+  filter(short_gene_id %in% exp_peptides_data$`Gene ID`)
+```
+
+## Plots
+
+For each gene id (MGG number), we select the scaled abundance value as a
+data frame `df` and for each peptide corresponding to this MGG number,
+we display the barplot.
+
+```{r, message=FALSE, warning=FALSE}
+for(g in unique(ms1_data$short_gene_id %>% unique())){
+  #print(g)
+  
+  plot_list = list()
+  
+  df = ms1_data %>% filter(short_gene_id == g) %>%
+    mutate(genotype = factor(genotype, levels = c('Guy11', 'dpmk1')))
+  
+  for(p in unique(df$sequence)){
+    # print(p)
+    
+    plot = df %>% filter(sequence == p) %>%
+    ggplot(.) +
+    geom_col(aes(x = as.factor(timepoint), 
+     y = value, 
+     fill = genotype), 
+    position = "dodge") +
+      labs(title = g, 
+        subtitle = paste(p), 
+        x = "time",
+        y = "scaled abundance") +
+      lims(y = c(0,1)) +
+      scale_fill_manual(values = c("#FDE725FF", "#414487FF"),
+        name = 'Genotypes',
+        labels = c('Guy11', expression(paste(Delta, "pmk1")))) +
+      theme_classic() + 
+      theme(aspect.ratio = 1)
+    
+     plot_list[[p]] = plot
+  }
+  
+  pdf_filename = here::here("graphics", paste0("013-ms1", g, "-bar-plots.pdf"))
+  ggexport(plot_list, filename = pdf_filename,
+    width = 6, height = 4)
+}
+```

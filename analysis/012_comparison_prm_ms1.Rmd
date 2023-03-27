@@ -35,7 +35,7 @@ Objective is to tidy the data sets in order to compare PRM and MS1 data.
 Let's load the PRM (parallel reaction monitoring?) data
 
 ```{r, warning=FALSE}
-prm_filepath = paste0(here::here(), "/raw/M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_thesis_copy.xlsx")
+prm_filepath = paste0(here::here(), "/data/raw/M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_thesis_copy.xlsx")
 prm_data = readxl::read_xlsx(prm_filepath)
 ```
 
@@ -286,7 +286,7 @@ clean_tidy_prm_data = clean_tidy_prm_scaled_data %>%
 Write the tidy PRM data.
 
 ```{r}
-readr::write_csv(clean_tidy_prm_data, here::here("cleaned", "012_clean_tidy_prm_scaled_data.csv"))
+readr::write_csv(clean_tidy_prm_data, here::here("data", "cleaned", "012_clean_tidy_prm_scaled_data.csv"))
 ```
 
 ## MS1
@@ -296,7 +296,7 @@ readr::write_csv(clean_tidy_prm_data, here::here("cleaned", "012_clean_tidy_prm_
 Let's load the MS1 (mass spectrometry 1?) data
 
 ```{r}
-ms1_filepath = paste0(here::here(), "/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx")
+ms1_filepath = paste0(here::here(), "/data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx")
 ms1_data = readxl::read_xlsx(ms1_filepath, trim_ws = TRUE)
 ```
 
@@ -413,12 +413,12 @@ clean_tidy_ms1_scaled_data = cbind(ms1_mdata$row_info, ms1_mdata$data_scaled) %>
 ```
 
 ```{r}
-readr::write_csv(clean_tidy_ms1_scaled_data, here::here("cleaned", "012_clean_tidy_ms1_scaled_data.csv"))
+readr::write_csv(clean_tidy_ms1_scaled_data, here::here("data", "cleaned", "012_clean_tidy_ms1_scaled_data.csv"))
 ```
 
 ## COMPARISON
 
-Let's prep the datasets
+Let's prep the data sets
 
 ```{r}
 prm_data = clean_tidy_prm_data %>%
@@ -476,5 +476,6 @@ for (p in unique(ms1_data$tech_pep_modif)) {
 Export all the plots in a single pdf file (one page per peptide)
 
 ```{r}
-ggexport(plot_list, filename="all-prm-ms1-comparison-plots.pdf")
+pdf_filename = here::here("graphics", "012-all-prm-ms1-comparison-plots.pdf")
+ggexport(plot_list, filename = pdf_filename)
 ```

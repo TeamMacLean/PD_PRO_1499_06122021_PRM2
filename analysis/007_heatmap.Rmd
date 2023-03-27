@@ -1,6 +1,6 @@
 ---
 title: "007 Heatmap"
-author: "Dan MacLean and Clara Jegousse"
+author: "Dan MacLean and Clara Jégousse"
 date: "25/01/2022"
 output: html_document
 ---
@@ -244,6 +244,8 @@ Hope it works!
 # Heatmap showing selected targets
 
 Update: November 2022 by Clara
+
+Neftaly wants the heatmap only for a subset of selected peptides.
 
 ## Load data
 
@@ -502,7 +504,7 @@ ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)
   ggplot2::theme(strip.text.x = element_text(size = 4))
 ```
 
-Save the plots.
+Save the plot.
 
 ```{r}
 graphics_dir = paste(here::here(), "graphics", sep = "/")
@@ -512,91 +514,37 @@ last_plot()
 dev.off()
 ```
 
-## Experimentally validated peptides
+## Individual plots
 
-### Prepare the data table
-
-Load the list of peptides with experimental data in the literature according to Neftaly.
+Rather than plotting one single plot with many facets, we will plot one plot per page.
 
 ```{r}
-exp_peptides_filepath = paste0(here::here(), "/data/raw/Experimentally validated phosphorylation sites in appressorium.xlsx")
-exp_peptides_data = readxl::read_xlsx(exp_peptides_filepath)
-```
-
-Find this peptides in the matrix of peptides with significantly different fold changes.
-
-```{r}
-exp_targets = data.frame(
-  id = rownames(sig_fc_mat) %>% as.vector(),
-  selected = stringr::str_split(rownames(sig_fc_mat), " ", simplify = TRUE, n = 2)[,1] %in% exp_peptides_data$`Gene ID`)
-```
-
-Out of the 17 peptides with experimental data in the literature, only 9 are in the matrix.
-
-```{r}
-exp_targets_in_sig_fc_mat = exp_targets %>% dplyr::filter(selected == TRUE) %>% 
-  dplyr::mutate(gene_id = stringr::str_split(id, " ", simplify = TRUE, n = 2)[,1]) %>% 
-  dplyr::select(gene_id)
-
-exp_targets_in_sig_fc_mat %>% unique() %>% dim()
-```
-
-List the peptides with experimental data in the literature that are NOT in the matrix
-
-```{r}
-exp_peptides_data %>%
-  dplyr::filter(`Gene ID` %in% exp_targets_in_sig_fc_mat$gene_id == FALSE)
-```
-
-Subset the matrix to keep only the peptides with experimental data.
-
-```{r}
-selection = exp_targets %>% dplyr::filter(selected == TRUE) %>% dplyr::select(id)
-select_sig_fc_mat = sig_fc_mat[selection$id,]
-```
-
-```{r}
-select_sig_fc_tb = select_sig_fc_mat %>% 
-  dplyr::as_tibble() %>% 
-  dplyr::mutate(gene_id = rownames(select_sig_fc_mat)) 
-```
-
-Melt the matrix into a dataframe
-
-```{r}
-select_sig_fc_tb_melted = select_sig_fc_tb %>% 
-  tidyr::pivot_longer(cols = `Guy11_1-Guy11_0`:`dpmk1_6-dpmk1_0`, 
-    values_to = "FC", names_to = "comparison") %>%
-  tidyr::separate(comparison, c("treatment", "misc"), "_") %>%
-  tidyr::separate(misc, c("time", "misc1"), "-") %>%
-  dplyr::mutate(gene_id =  stringr::str_replace(gene_id, '\\) ', '\\)\n')) %>%
-  dplyr::select(gene_id, treatment, time, FC)
-```
-
-### Draw the barplots
-
-Choose the colours
-
-```{r}
-chosen_red = RColorBrewer::brewer.pal(6, 'RdBu')[1]
-chosen_blue = RColorBrewer::brewer.pal(6, 'RdBu')[6]
-```
-
-Draw the plot
-
-```{r}
-ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)) + 
+plot_list = list()
+for (p in select_sig_fc_tb_melted$gene_id %>% unique()) {
+  #print(p)
+  
+  df = select_sig_fc_tb_melted %>% 
+    dplyr::filter(gene_id == p) %>%
+    dplyr::mutate(treatment = factor(treatment, levels = c('Guy11', 'dpmk1')))
+  
+ plot = ggplot2::ggplot(df, aes(x = time, y = FC, fill = treatment)) + 
   ggplot2::geom_bar(position="dodge", stat = "identity") + 
-  ggplot2::scale_fill_manual(values = c(chosen_red, chosen_blue), name = "", 
-    labels = c(expression(paste(Delta, "pmk1")), 'Guy11')) +
-  ggplot2::facet_wrap(~ gene_id, scales = "free") + 
-  ggplot2::theme_minimal() + 
-  ggplot2::theme(strip.text.x = element_text(size = 4))
+  ggplot2::scale_fill_manual(
+    values = c(chosen_red, chosen_blue), 
+    name = "Genotypes", 
+    labels = c('Guy11', expression(paste(Delta, "pmk1")))) +
+  ggplot2::theme_classic() + 
+  ggplot2::theme(aspect.ratio = 1, 
+    plot.title = element_text(size = 10)) +
+  ggplot2::labs(title = p)
+ 
+  plot_list[[p]] = plot
+ }
+#plot
 ```
 
-```{r}
-graphics_path = paste(here::here(), "graphics", sep = "/")
-plot_filename = paste(graphics_path, "007-prm-pep-exp-validation-barplots.pdf", sep = "/")
-
-ggsave(plot_filename, plot = last_plot(), width = 11, height = 8)
+```{r, echo=FALSE, warning=FALSE}
+  pdf_filename = here::here("graphics", paste0("007-prm-bar-plots.pdf"))
+  ggpubr::ggexport(plot_list, filename = pdf_filename,
+    width = 6, height = 4)
 ```

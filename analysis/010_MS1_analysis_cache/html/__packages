@@ -1,8 +1,15 @@
+base
+methods
+datasets
+utils
+grDevices
+graphics
+stats
 readxl
 here
 dplyr
 tidyr
 readr
+stringr
 ggplot2
 factoextra
-stringr

@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-
 Frank would like a heatmap of some MS1 data, clustered on `Guy11` samples only and scaled by row in the range 0 - 1.
 
 ## Load libraries
@@ -65,7 +64,7 @@ cleaned <- read_excel(file, sheet=excel_sheets(file)) |>
   str_replace(., "2xPhospho", "")) %>%
   mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
 
-write_csv(cleaned, here("data/cleaned/ms1_cleaned.csv"))
+write_csv(cleaned, here("data/cleaned/010_ms1_cleaned.csv"))
 ```
 
 
@@ -89,7 +88,6 @@ cleaned =  read_excel(file, sheet=excel_sheets(file)) |>
   str_replace_all(., "2xPhospho ", "")) %>%
   mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
 ```
-
 
 
 ## Build the matrix
@@ -151,7 +149,6 @@ The heatmap is drawn with this ordering. Note the grey NA values not mentioned i
 pal <- viridis::viridis_pal()
 colours <-  pal(11)
 
-
 ## draw! 
   
   ComplexHeatmap::Heatmap(m, column_order = c(guy11, dpmk), 
@@ -163,8 +160,6 @@ colours <-  pal(11)
                         )
 
 ```
-
-
 
 ### Replace NAs with minimal data value
 
@@ -193,7 +188,6 @@ plot(hc)
 #### Draw heatmap
 
 The heatmap is drawn with this ordering
-
 
 ```{r, fig.height=15,eval=TRUE}
 pal <- viridis::viridis_pal()
@@ -283,7 +277,7 @@ make_csv <- function(mat,km,rows) {
       tm <- t(as.matrix(tm))
       rownames(tm) <- rnames
     }
-    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11.csv"))
+    file <- here("results", paste("010_kmeans_cluster_", i, "_on_guy11.csv"))
     df <- as.data.frame(tm)
     df$id = rows[rnames]
     write_csv(df, file)
@@ -342,7 +336,7 @@ make_csv <- function(mat,km,rows) {
       tm <- t(as.matrix(tm))
       rownames(tm) <- rnames
     }
-    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11_and_dpmk1.csv"))
+    file <- here("results", paste("010_kmeans_cluster_", i, "_on_guy11_and_dpmk1.csv"))
     df <- as.data.frame(tm)
     df$id = rows[rnames]
     write_csv(df, file)
@@ -423,7 +417,6 @@ h1 = ComplexHeatmap::Heatmap(m,
   row_names_gp = grid::gpar(fontsize = 5),
   column_labels = col_labels
 )
-
 ```
 
 ## Version 2
@@ -499,8 +492,6 @@ h3
 ## Version 4
 
 ```{r}
-
-
 # heatmap-MS1-v4-time-comp
 h4 = ComplexHeatmap::Heatmap(m, 
   column_order = c(guy11, dpmk), 
@@ -536,5 +527,4 @@ h4 = ComplexHeatmap::Heatmap(m,
   column_labels = col_labels
 )
 h4
-
 ```
