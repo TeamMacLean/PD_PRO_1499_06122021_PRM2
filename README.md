@@ -30,6 +30,9 @@ Performed as described in the repo `.Rmd` using the tools previously developed i
   * 27-01-2023 [CJ]
   MS1 heatmap for select pathways.
   
+  * 20-03-2023 [CJ]
+  Barplots for selected peptides from the MS1 dataset. 
+  
   ## TODO
   
-  - [ ] Re-organise directories for input files and output files.
+  - [x] Re-organise directories for input files and output files >> project now contains directories for data, results, and graphics. 
