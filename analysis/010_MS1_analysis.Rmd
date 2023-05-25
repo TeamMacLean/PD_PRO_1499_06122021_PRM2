@@ -10,37 +10,89 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-
 Frank would like a heatmap of some MS1 data, clustered on `Guy11` samples only and scaled by row in the range 0 - 1.
 
+## Load libraries
 
-## Load and clean the data
 ```{r}
 library(readxl)
 library(here)
 library(dplyr)
 library(tidyr)
 library(readr)
+library(stringr)
+```
 
-file <- here("raw/Nrc210121_rgm2r.xlsx" )
 
+## Load and clean the data
+
+```{r, include=FALSE, eval=FALSE}
+file <- here("data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx" )
 
 cleaned <- read_excel(file, sheet=excel_sheets(file)) |> 
-  select(`Positions in Master Proteins`, `Modifications`, starts_with("Abundances (Grouped):")) |> 
-  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`), names_to = "sample") |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
   mutate(
     sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
   ) |> 
   separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
   distinct()
   
-write_csv(cleaned, here("cleaned/ms1_cleaned.csv"))
+write_csv(cleaned, here("data/cleaned/ms1_cleaned.csv"))
 
 ```
 
+CJ: The next code chunk is adds a column `Label Modifications in Master Proteins` to meet Neftaly's and Frank's request for labels in heatmaps in subsequent analysis. 
+
+```{r}
+file <- here("data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx" )
+
+cleaned <- read_excel(file, sheet=excel_sheets(file)) |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
+  mutate(
+    sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
+  ) |> 
+  separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
+  distinct() %>% 
+  mutate(`Label Modifications in Master Proteins` = str_extract_all(`Modifications in Master Proteins`, "\\[(.*)\\]", simplify = TRUE) %>%
+   gsub("\\[|\\]", "", .) %>%
+  gsub("\\s*\\([^\\)]+\\)", "", .) %>%
+  str_replace(., "N-Term; ", "") %>%
+  str_replace(., "M([0-9]+); ", "") %>%
+  str_replace(., "1xPhospho", "") %>%
+  str_replace(., "2xPhospho", "")) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
+
+write_csv(cleaned, here("data/cleaned/010_ms1_cleaned.csv"))
+```
+
+
+```{r}
+cleaned =  read_excel(file, sheet=excel_sheets(file)) |> 
+  select(`Positions in Master Proteins`, `Modifications in Master Proteins`, `Modifications`, `Annotated Sequence`, starts_with("Abundances (Grouped):")) |> 
+  pivot_longer(cols = -c(`Positions in Master Proteins`, `Modifications`, `Annotated Sequence`, `Modifications in Master Proteins`), names_to = "sample") |> 
+  mutate(
+    sample = stringr::str_replace(sample, "Abundances \\(Grouped\\): ", "")
+  ) |> 
+  separate(sample, c('time', 'sample'), sep=", ",convert=TRUE) |> 
+  distinct() %>% 
+  # remove 1xMet-loss [N-Term]; 
+  mutate(`Modifications in Master Proteins` = gsub("1xMet-loss \\[N-Term\\]; ", "", x = `Modifications in Master Proteins`)) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(!is.na(`Modifications in Master Proteins`), str_extract_all(`Modifications in Master Proteins`, "\\[.*\\]", simplify = TRUE), str_extract_all(`Modifications`, "\\[.*\\]", simplify = TRUE)) %>%
+  gsub("\\[|\\]", "", .) %>%
+  gsub("\\s*\\([^\\)]+\\)", "", .) %>%
+  str_replace_all(., "N-Term; ", "") %>%
+  str_replace_all(., "M([0-9]+); ", "") %>%
+  str_replace_all(., "1xPhospho ", "") %>%
+  str_replace_all(., "2xPhospho ", "")) %>%
+  mutate(`Label Modifications in Master Proteins` = ifelse(is.na(`Label Modifications in Master Proteins`), gsub("\\[|\\]", "", str_extract_all(`Modifications`, "\\[(.*)\\]", simplify = TRUE)), `Label Modifications in Master Proteins`))
+```
+
+
 ## Build the matrix
 
-The long dataframe needs pivot-ing into a matrix. Scaling is applied too. 
+The long data frame needs pivot-ing into a matrix. Scaling is applied too. 
 
 ```{r}
 
@@ -54,14 +106,17 @@ m <- cleaned |>
 rows <- m$id
 m$id <- NULL
 raw_m <- as.matrix(m)
-
-## Now scale
-m <- t(apply(raw_m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
-
 ```
 
-## General hc cluster on `Guy11` columns only
+## Scale the matrix
 
+```{r}
+## Now scale
+m <- t(apply(raw_m, 1, function(x)(x-min(x, na.rm=TRUE))/(max(x, na.rm=TRUE)-min(x,na.rm=TRUE))))
+```
+
+
+## General hc cluster on `Guy11` columns only
 
 ### Replace NAs in `dist` calculation
 
@@ -94,7 +149,6 @@ The heatmap is drawn with this ordering. Note the grey NA values not mentioned i
 pal <- viridis::viridis_pal()
 colours <-  pal(11)
 
-
 ## draw! 
   
   ComplexHeatmap::Heatmap(m, column_order = c(guy11, dpmk), 
@@ -105,18 +159,11 @@ colours <-  pal(11)
 
                         )
 
-
-
 ```
-
-
 
 ### Replace NAs with minimal data value
 
 We can also replace NA with the minimum observed value on the whole abundance data - before scaling and distance measuring (don't know whether this is legit this time - Frank can illuminate) 
-
-
-
 
 ```{r}
 m <- raw_m
@@ -142,7 +189,6 @@ plot(hc)
 
 The heatmap is drawn with this ordering
 
-
 ```{r, fig.height=15,eval=TRUE}
 pal <- viridis::viridis_pal()
 colours <-  pal(11)
@@ -161,7 +207,6 @@ colours <-  pal(11)
 
 
 ```
-
 
 ## k-means on whole clustered by Guy11
 
@@ -232,7 +277,7 @@ make_csv <- function(mat,km,rows) {
       tm <- t(as.matrix(tm))
       rownames(tm) <- rnames
     }
-    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11.csv"))
+    file <- here("results", paste("010_kmeans_cluster_", i, "_on_guy11.csv"))
     df <- as.data.frame(tm)
     df$id = rows[rnames]
     write_csv(df, file)
@@ -240,8 +285,6 @@ make_csv <- function(mat,km,rows) {
 }
 make_csv(m, kmeans_clust,rows)
 ```
-
-
 
 
 ## kmeans on whole clustered by Guy11 and dpmk1
@@ -293,11 +336,195 @@ make_csv <- function(mat,km,rows) {
       tm <- t(as.matrix(tm))
       rownames(tm) <- rnames
     }
-    file <- here("analysis", paste("010_kmeans_cluster_", i, "_on_guy11_and_dpmk1.csv"))
+    file <- here("results", paste("010_kmeans_cluster_", i, "_on_guy11_and_dpmk1.csv"))
     df <- as.data.frame(tm)
     df$id = rows[rnames]
     write_csv(df, file)
   }
 }
 make_csv(m, kmeans_clust,rows)
+```
+
+
+# More heatmap visualisations
+
+CJ: Quick update on the heatmap as requested by Neftaly
+
+### General visual settings
+
+Colours
+
+```{r}
+pal <- viridis::viridis_pal()
+colours <-  pal(11)
+```
+
+Dendrogram for the row (proteins) clustering
+
+```{r}
+row_dend = as.dendrogram(hc)
+```
+
+Factor to set the order of the columns
+
+```{r}
+col_split = factor(stringr::str_split(colnames(m), "-", n = 2, simplify = TRUE)[,1], levels = c("Guy11", "dpmk1"))
+```
+
+Labels (times) for the columns
+
+```{r}
+col_labels = c('0h00', '0h00', 
+  '1h00', '1h00', '1h30', '1h30', 
+  '2h00', '2h00', '4h00', '4h00', 
+  '6h00', '6h00')
+```
+
+
+Factor to set the order of the clusters (according to Neftaly: 2,3,4,5,1):
+
+```{r}
+row_split = factor(kmeans_clust$cluster, levels=c("2","3","4","5","1"))
+```
+
+## Version 1
+
+```{r, fig.height=15,eval=TRUE}
+## draw! 
+
+# heatmap-MS1-v1-basic
+h1 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  row_order = row_order,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+```
+
+## Version 2
+
+```{r}
+
+# heatmap-MS1-v2-clusters
+h2 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  cluster_rows = row_dend,
+  row_dend_width = grid::unit(0.1, "cm"),
+  row_dend_gp = grid::gpar(col = "white"),
+  row_split = 5,
+
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+h2
+```
+
+## Version 3
+
+```{r}
+# heatmap-MS1-v3-clusters-with-dend
+h3 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  cluster_rows = row_dend,
+  row_dend_width = grid::unit(4, "cm"),
+  row_dend_gp = grid::gpar(col = "black"),
+  row_split = 5,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  height=grid::unit(10, "cm"),
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled Abundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 5),
+  column_labels = col_labels
+)
+h3
+```
+
+## Version 4
+
+```{r}
+# heatmap-MS1-v4-time-comp
+h4 = ComplexHeatmap::Heatmap(m, 
+  column_order = c(guy11, dpmk), 
+  
+  #cluster_rows = row_dend,
+  row_dend_width = grid::unit(0.1, "cm"),
+  row_dend_gp = grid::gpar(col = "white"),
+  row_split = row_split,
+  cluster_row_slices = FALSE,
+  
+  #row_order = row_order,
+  
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
+  #column_gap = grid::unit(0.25, "cm"),
+  
+  col = colours,
+  
+  # 25 cm is the maximum to print in portrait orientation on A4
+  height=grid::unit(10, "cm"), # change to 10 to visualise in RStudio
+  width=grid::unit(5, "cm"),
+  
+  use_raster=FALSE,
+  heatmap_legend_param = list(title = "Scaled\nAbundance",
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")
+  ),
+  
+  column_names_gp = grid::gpar(fontsize = 8),
+  row_title_gp = grid::gpar(fontsize = 10),
+  
+  column_labels = col_labels
+)
+h4
 ```

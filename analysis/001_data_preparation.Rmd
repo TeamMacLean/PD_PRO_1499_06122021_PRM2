@@ -11,8 +11,8 @@ library(magrittr)
 ## Load and inspect Paul's `.xlsx` document
 
 ```{r}
-xlp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics.xlsx")
-xlmvp <- here::here("raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_missing_values.xlsx")
+xlp <- here::here("data", "raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics.xlsx")
+xlmvp <- here::here("data", "raw", "M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_informatics_missing_values.xlsx")
 
 readxl::excel_sheets(xlp)
 

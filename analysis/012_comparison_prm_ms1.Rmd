@@ -1,0 +1,481 @@
+---
+title: "012 Comparison of PRM and MS1 data"
+author: "Clara Jégousse"
+date: "2022-12-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Libraries
+
+```{r, include=FALSE}
+library(here)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(readxl)
+
+# for visualisation
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+```
+
+## PRM
+
+CJ 2022.12.09
+
+Objective is to tidy the data sets in order to compare PRM and MS1 data.
+
+### Load PRM data
+
+Let's load the PRM (parallel reaction monitoring?) data
+
+```{r, warning=FALSE}
+prm_filepath = paste0(here::here(), "/data/raw/M_oryzae_PRM_TEMP_07_with_spectra_refined_Guy11_deltaPmk1_timecourse_for_thesis_copy.xlsx")
+prm_data = readxl::read_xlsx(prm_filepath)
+```
+
+### Tidy data PRM data
+
+We tidy the data with the following steps:
+
+1.  pivot/melt the data using the samples names `Replicate names`
+
+2.  select the columns of interests
+
+3.  format/rename column names to be only in lowercase
+
+4.  format/rename column names without white spaces
+
+5.  Split the `replicate_name` into different columns for "genotype", "timepoint", "bio_rep", "tech_rep", "misc" using `_` as the separator
+
+6.  replace "Spore" to `0` for consistency in variable `timepoint`
+
+7.  format variable bio_rep
+
+8.  format variable tech_rep
+
+9.  select/order the columns of interests
+
+```{r}
+tidy_prm_data = prm_data %>%
+  tidyr::pivot_longer(cols = Guy11_Spores_r1_t2_02_ncr200619_01:dpmk1_6_r3_t2_72_ncr200619_36, 
+    names_to = 'Replicate Name', values_to = 'Total Area') %>%
+  dplyr::select( `Replicate Name`, `Molecule List Name`, `Total Area`, `Peptide Modified Sequence`) %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>% 
+  dplyr::rename(gene_id = molecule_list_name) %>%
+  dplyr::rename(peptide = peptide_modified_sequence) %>%
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep", "tech_rep", "misc"), sep="_") %>%
+  dplyr::mutate(
+    timepoint = as.numeric(dplyr::if_else(timepoint == 'Spores', "0", timepoint)),
+    bio_rep = as.numeric(stringr::str_sub(bio_rep, 2,-1)),
+    tech_rep = as.numeric(stringr::str_sub(tech_rep, 2,-1))
+  ) %>% 
+  dplyr::select(gene_id, peptide, genotype, timepoint, bio_rep, tech_rep, total_area)
+  
+```
+
+### Format peptide sequences in PRM data
+
+According to Frank Menke, we should remove the phosphorylation positions and other information and only keep the amino-acid sequence.
+
+```{r}
+clean_tidy_prm_data = tidy_prm_data %>% 
+  mutate(peptide = gsub("\\[([^]]+)\\]", "", peptide))
+```
+
+### Combine technical replicates
+
+Let's combine the technical replicates (`tr`) by:
+
+1.  group by 'gene_id', 'peptide', 'genotype', 'timepoint'
+
+2.  calculate the mean
+
+```{r}
+mean_tr_prm_data = clean_tidy_prm_data %>%
+  dplyr::group_by(.data$gene_id, .data$peptide, .data$genotype, .data$timepoint, .data$bio_rep) %>%
+  dplyr::summarize(mean_tr_total_area = mean(.data$total_area, na.rm = TRUE) )
+```
+
+### Convert to matrix
+
+Convert data frame to matrix
+
+1.  pivot tidy data frame into wide data frame
+
+2.  save row and column information
+
+3.  convert data frame into matrix
+
+4.  list the row information and the matrix
+
+```{r}
+mean_tr_prm_matrix <- mean_tr_prm_data %>%
+    tidyr::pivot_wider(names_from = c(genotype, timepoint, bio_rep),
+      values_from = mean_tr_total_area) %>%
+    as.matrix()
+
+row_info <- mean_tr_prm_matrix[,c("gene_id", "peptide")]
+col_info <- colnames(mean_tr_prm_matrix[,3:length(colnames(mean_tr_prm_matrix))])
+  
+matrix <- matrix(as.numeric(mean_tr_prm_matrix[,3:ncol(mean_tr_prm_matrix)]), 
+  nrow = nrow(mean_tr_prm_matrix) )
+colnames(matrix) <- col_info
+
+mdata = list( row_info = row_info, data = matrix )
+```
+
+Inspect the list
+
+```{r, echo=FALSE, include=FALSE}
+head(mdata$data)
+head(mdata$row_info)
+```
+
+### Replace missing values
+
+Let's define a function to extract the minimum values so that we can extract all the lowest values for each row of the dataset.
+
+```{r}
+min_peptide_values <- function(d){
+  apply(d$data, MARGIN = 1, min, na.rm = TRUE)
+}
+
+lowest_vals <- min_peptide_values(mdata)
+```
+
+Let's define a function to replace NA values with lowest values
+
+```{r}
+replace_vals <- function(x, lowest_vals){
+  to_replace <- which(is.na(x))
+  x[to_replace] <- lowest_vals[to_replace]
+  return(x)
+}
+```
+
+Create a new matrix with no NA
+
+```{r}
+mdata$data_complete = cbind(
+  apply(mdata$data %>% as.data.frame() %>%
+    select(.,contains("Guy11")), 
+    MARGIN = 2, replace_vals, lowest_vals),
+  apply(mdata$data %>% as.data.frame() %>%
+    select(.,contains("dpmk")), 
+    MARGIN = 2, replace_vals, lowest_vals))
+```
+
+Let's display the heatmap
+
+```{r}
+m <- mdata$data
+rownames(m) <- mdata$row_info[,'peptide']
+colnames(m) <- colnames(mdata$data)
+
+# have a look at a subset of the matrix
+m = m[1:20, 1:12]
+
+col_fun = circlize::colorRamp2(c(0, 0.0014), c( "white", "blue"))
+
+col_split = factor(paste(stringr::str_split(colnames(m), "_", n = 3, 
+  simplify = TRUE)[,1], stringr::str_split(colnames(m), "_", n = 3, 
+    simplify = TRUE)[,2], sep =  "_"))
+
+hm_na = ComplexHeatmap::Heatmap(m, 
+  column_split = col_split, 
+  column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = colnames(m),
+  show_column_names = FALSE,
+  row_order = rownames(m), 
+  show_row_names = FALSE,
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun )
+
+m <- mdata$data_complete
+rownames(m) <- mdata$row_info[,'peptide']
+colnames(m) <- colnames(mdata$data)
+
+# have a look at a subset of the matrix
+m = m[1:20, 1:12]
+
+col_fun = circlize::colorRamp2(c(0, 0.0014), c( "white", "blue"))
+
+col_split = factor(paste(stringr::str_split(colnames(m), "_", n = 3, 
+  simplify = TRUE)[,1], stringr::str_split(colnames(m), "_", n = 3, 
+    simplify = TRUE)[,2], sep =  "_"))
+
+hm_complete = ComplexHeatmap::Heatmap(m, 
+  column_split = col_split, 
+  column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = colnames(m),
+  show_column_names = FALSE,
+  row_order = rownames(m), 
+  show_row_names = FALSE,
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun )
+
+hm_na
+hm_complete
+```
+
+### Scaling
+
+We scale from 0 to 1
+
+```{r}
+maxs <- apply(mdata$data_complete, 2, max)
+mins <- apply(mdata$data_complete, 2, min)
+
+mdata$data_scaled = scale(mdata$data_complete, center = mins, scale = maxs - mins)
+```
+
+```{r}
+m <- mdata$data_scaled
+rownames(m) <- mdata$row_info[,'peptide']
+colnames(m) <- colnames(mdata$data)
+
+# have a look at a subset of the matrix
+m = m[1:20, 1:12]
+
+col_fun = circlize::colorRamp2(c(0, 1), c( "white", "blue"))
+
+col_split = factor(paste(stringr::str_split(colnames(m), "_", n = 3, 
+  simplify = TRUE)[,1], stringr::str_split(colnames(m), "_", n = 3, 
+    simplify = TRUE)[,2], sep =  "_"))
+
+hm_scaled = ComplexHeatmap::Heatmap(m, 
+  column_split = col_split, 
+  column_title_gp = grid::gpar(fontsize = 8),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = colnames(m),
+  show_column_names = FALSE,
+  row_order = rownames(m), 
+  show_row_names = FALSE,
+  rect_gp = grid::gpar(col = "white", lwd = 2 ), 
+  col = col_fun )
+
+hm_scaled
+```
+
+### Combine biological replicates
+
+```{r}
+clean_tidy_prm_scaled_data = cbind(mdata$row_info, mdata$data_scaled) %>% as.data.frame() %>%
+  tidyr::pivot_longer(cols = Guy11_0_1:dpmk1_6_3, 
+    names_to = 'replicate_name', values_to = 'abundance') %>%
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint", "bio_rep"), sep="_")
+```
+
+```{r}
+clean_tidy_prm_data = clean_tidy_prm_scaled_data %>%
+  dplyr::group_by(gene_id, peptide, genotype, timepoint) %>%
+  dplyr::summarize(abundance = mean(as.numeric(abundance), na.rm = TRUE) )
+```
+
+### Write clean tidy scaled data
+
+Write the tidy PRM data.
+
+```{r}
+readr::write_csv(clean_tidy_prm_data, here::here("data", "cleaned", "012_clean_tidy_prm_scaled_data.csv"))
+```
+
+## MS1
+
+### Load MS1 data
+
+Let's load the MS1 (mass spectrometry 1?) data
+
+```{r}
+ms1_filepath = paste0(here::here(), "/data/raw/Nrc210121_rgm2r_1to6hrsMS1Q.xlsx")
+ms1_data = readxl::read_xlsx(ms1_filepath, trim_ws = TRUE)
+```
+
+### Tidy data
+
+```{r}
+tidy_ms1_data = ms1_data %>% 
+  select("Annotated Sequence", "Modifications", "Master Protein Accessions", contains("(grouped):")) %>%
+  dplyr::rename_with(tolower) %>% 
+  dplyr::rename_with( ~ gsub(" ", "_", .x)) %>%
+  dplyr::rename_with( ~ gsub(",", "", .x)) %>%
+  dplyr::rename_with( ~ gsub(":", "", .x)) %>%
+  dplyr::rename_with( ~ gsub("\\(", "", .x)) %>%
+  dplyr::rename_with( ~ gsub("\\)", "", .x)) %>%
+  tidyr::pivot_longer(cols = abundances_grouped_0_dpmk1:abundances_grouped_6_guy11, 
+    names_to = 'replicate_name', values_to = 'total_area') %>%
+  tidyr::separate(replicate_name, into = c("abund", "grouped", "timepoint", "genotype"), sep="_") %>%
+  dplyr::rename(gene_id = master_protein_accessions) %>%
+  dplyr::rename(peptide = annotated_sequence) %>%
+  mutate(total_area = as.numeric(total_area)) %>%
+  dplyr::select(gene_id, peptide, modifications, genotype, timepoint, total_area)
+
+```
+
+### Format peptide sequences
+
+```{r}
+clean_tidy_ms1_data = tidy_ms1_data  %>%
+  mutate(peptide = gsub("^\\[([^]]+)\\].", "", peptide)) %>%
+  mutate(peptide = gsub(".\\[([^]]+)\\]$", "", peptide))
+```
+
+### Select peptides with PRM and MS1 values
+
+Check the number of peptides in MS1 data
+
+```{r}
+clean_tidy_ms1_data$peptide %>% unique() %>% length()
+clean_tidy_prm_data$peptide %>% unique() %>% length()
+```
+
+There are 2830 peptides in MS1 and 191 in PRM.
+
+```{r}
+prm_peptides = clean_tidy_prm_data$peptide %>% unique()
+
+selected_clean_tidy_ms1_data = clean_tidy_ms1_data %>%
+ filter(peptide %in% prm_peptides)
+
+selected_clean_tidy_ms1_data$peptide %>% unique() %>% length()
+```
+
+There are 88 peptides in MS1 that are also in PRM.
+
+### Convert to matrix
+
+```{r}
+selected_clean_ms1_matrix = selected_clean_tidy_ms1_data %>%
+    tidyr::pivot_wider(names_from = c(genotype, timepoint),
+      values_from = total_area) %>%
+    as.matrix()
+
+row_info = selected_clean_ms1_matrix[,c("gene_id", "peptide", "modifications")]
+col_info = colnames(selected_clean_ms1_matrix[,4:length(colnames(selected_clean_ms1_matrix))])
+
+ms1_matrix = apply(matrix(selected_clean_ms1_matrix[,4:ncol(selected_clean_ms1_matrix)], 
+  nrow = nrow(selected_clean_ms1_matrix)), 2, as.numeric)
+
+colnames(ms1_matrix) <- col_info
+
+ms1_mdata = list( row_info = row_info, data = ms1_matrix )
+```
+
+### Replace missing values
+
+Let's re-use the functions we defined earlier to extract the minimum values and to replace NA values with lowest values.
+
+```{r}
+lowest_vals <- min_peptide_values(ms1_mdata)
+```
+
+Create a new matrix with no NA
+
+```{r}
+ms1_mdata$data_complete = cbind(
+  apply(ms1_mdata$data %>% as.data.frame() %>%
+    select(.,contains("Guy11")), 
+    MARGIN = 2, replace_vals, lowest_vals),
+  apply(ms1_mdata$data %>% as.data.frame() %>%
+    select(.,contains("dpmk")), 
+    MARGIN = 2, replace_vals, lowest_vals))
+```
+
+### Scaling
+
+We scale from 0 to 1
+
+```{r}
+maxs <- apply(ms1_mdata$data_complete, 2, max)
+mins <- apply(ms1_mdata$data_complete, 2, min)
+
+ms1_mdata$data_scaled = scale(ms1_mdata$data_complete, center = mins, scale = maxs - mins)
+```
+
+### Write clean tidy scaled data
+
+Write the tidy MS1 data.
+
+```{r}
+clean_tidy_ms1_scaled_data = cbind(ms1_mdata$row_info, ms1_mdata$data_scaled) %>% as.data.frame() %>%
+  tidyr::pivot_longer(cols = guy11_0:dpmk1_6, 
+    names_to = 'replicate_name', values_to = 'abundance') %>%
+  tidyr::separate(replicate_name, into = c("genotype", "timepoint"), sep="_") 
+```
+
+```{r}
+readr::write_csv(clean_tidy_ms1_scaled_data, here::here("data", "cleaned", "012_clean_tidy_ms1_scaled_data.csv"))
+```
+
+## COMPARISON
+
+Let's prep the data sets
+
+```{r}
+prm_data = clean_tidy_prm_data %>%
+  mutate(tech_pep = paste("PRM", peptide)) %>%
+  select(tech_pep, gene_id, peptide, genotype, timepoint, abundance)
+
+ms1_data = clean_tidy_ms1_scaled_data %>%
+  mutate(tech_pep_modif = paste("MS1", peptide, modifications)) %>%
+  select(tech_pep_modif, gene_id, peptide, modifications, genotype, timepoint, abundance)
+```
+
+## Visualisation
+
+For each peptide and modification in the MS1 data, we will draw the plot based on the MS1 results and the corresponding PRM plot.
+
+```{r, echo=TRUE, include=FALSE}
+# create an empty list to store all the plots
+plot_list = list()
+for (p in unique(ms1_data$tech_pep_modif)) {
+  # print(p)
+  
+  pep = ms1_data[ms1_data$tech_pep_modif == p,]$peptide %>% unique()
+  modif = ms1_data[ms1_data$tech_pep_modif == p,]$modifications %>% unique()
+  
+  prm_data_plot = prm_data %>%
+  filter(peptide == pep) %>%
+  mutate(abundance = as.numeric(abundance),
+    timepoint = as.numeric(timepoint))
+  
+  prm_plot = ggplot(prm_data_plot) + 
+  geom_line(aes(x = timepoint, y = abundance, colour = genotype),
+    linetype = "solid") +
+    scale_colour_manual(values = c("red", "black")) +
+    ggtitle("PRM", subtitle = pep)
+  
+  ms1_data_plot = ms1_data %>%
+  filter(peptide == pep) %>%
+  filter(modifications == modif) %>%
+  mutate(abundance = as.numeric(abundance),
+    timepoint = as.numeric(timepoint))
+  
+  ms1_plot = ggplot(ms1_data_plot) + 
+  geom_line(aes(x = timepoint, y = abundance, colour = genotype),
+    linetype = "dashed") +
+    scale_colour_manual(values = c("red", "black")) +
+    ggtitle("MS1", subtitle = paste(pep, modif))
+  
+  plot_list[[p]] = plot_grid(prm_plot, ms1_plot,
+    ncol = 1)
+  
+}
+# the list is not ready
+```
+
+Export all the plots in a single pdf file (one page per peptide)
+
+```{r}
+pdf_filename = here::here("graphics", "012-all-prm-ms1-comparison-plots.pdf")
+ggexport(plot_list, filename = pdf_filename)
+```

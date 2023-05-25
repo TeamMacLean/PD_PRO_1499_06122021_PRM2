@@ -1,6 +1,6 @@
 ---
 title: "007 Heatmap"
-author: "Dan MacLean"
+author: "Dan MacLean and Clara Jégousse"
 date: "25/01/2022"
 output: html_document
 ---
@@ -26,23 +26,19 @@ ll <- ul * -1
 
 library(pepdiff)
 
-ht <- plot_heatmap(many, metric = "bootstrap_t", log = TRUE, sig = 1, only_sig_points = FALSE, all_points = TRUE, scale_min = ll, scale_max = ul)
-
-
-
-```
-
-```{r,fig.height=36, fig.width=10}
-
-lgd <- ComplexHeatmap::Legend(direction = "horizontal",
-  col_fun = circlize::colorRamp2(
-                           seq(ll, ul, length.out = 11),
-                           rev(RColorBrewer::brewer.pal(11, "RdBu"))
-                         ),
-  title = "Log 2 Fold Change")
-
-ComplexHeatmap::draw(ht, padding=grid::unit(c(0.5,0.5,0.5,4), "in"))
-ComplexHeatmap::draw(lgd, x = grid::unit(8, "in"), y = grid::unit(1, "in"))
+ht = plot_heatmap(
+  many,
+  sig_level = 1,
+  metric = "bootstrap_t_fdr",
+  log = TRUE,
+  base = 2,
+  col_order = NULL,
+  sig_only = FALSE,
+  pal = "RdBu",
+  lgd_x = 1.7,
+  lgd_y = 1,
+  padding=grid::unit(c(0.5,0.5,0.5,4), "in")
+)
 ```
 
 Looks much better! Let's try with a filter on the sig value. I'll hand roll the code to cross check for problems.
@@ -52,7 +48,7 @@ Looks much better! Let's try with a filter on the sig value. I'll hand roll the 
 ##extract the fc columns from the list of dfs
 fc_mats <- lapply(many, function(x){
   srted <- dplyr::mutate(x, 
-                gene_peptide = gene_id,
+                gene_peptide = paste(gene_id, peptide, sep=" "),
                 log_fc = log2(fold_change)
                 ) %>%
     dplyr::arrange(gene_peptide) %>%  ##crucial to sort rows to be in same order for later steps
@@ -81,31 +77,24 @@ sig_mats <- lapply(many, function(x){
   rownames(srted_m) <- rname
   return(srted_m)
 })
-
 ##join the columns into a matrix
 sig_m <- do.call(cbind, sig_mats)
 colnames(sig_m) <- names(sig_mats)
 
 ## work out if any rows (peptides) have any sig values <= 0.05 )
 sig_rows <- apply(sig_m, 1, function(x) {any(x <= 0.05 )})
-
 ## deal with NAs from uncomplete bootstraps
 sig_rows[is.na(sig_rows)] <- FALSE
-
 ## select only fc valeues for passing peptides
 sig_fc_mat <- fc_m[sig_rows,]
-
-
 ## get upper and lower limits
 max_fc <- max(sig_fc_mat)
 min_fc <- min(sig_fc_mat)
-
 ul <- max(abs(c(max_fc, min_fc)))
 ll <- ul * -1
 
-
 ## draw! 
-col_order <- names(sig_fc_mat)
+col_order <- colnames(sig_fc_mat)
 new_ht <- ComplexHeatmap::Heatmap(sig_fc_mat, column_order = col_order,
                         col = circlize::colorRamp2(
                           seq(ll,ul, length.out = 11),
@@ -116,8 +105,6 @@ new_ht <- ComplexHeatmap::Heatmap(sig_fc_mat, column_order = col_order,
                         column_names_gp = grid::gpar(fontsize=24, fontface="bold"),
                         row_names_gp = grid::gpar(fontsize=15, fontface="bold")
                         )
-
-
 lgd <- ComplexHeatmap::Legend(direction = "horizontal",
   col_fun = circlize::colorRamp2(
                            seq(ll, ul, length.out = 11),
@@ -127,8 +114,6 @@ lgd <- ComplexHeatmap::Legend(direction = "horizontal",
   labels_gp =  grid::gpar(fontsize = 24, fontface = "bold"),
   title_gp = grid::gpar(fontsize = 24, fontface = "bold"),
   title = "Log 2 Fold Change")
-
-
 ComplexHeatmap::draw(new_ht,
                      row_dend_width=grid::unit(3,"in"),
                      height=grid::unit(36, "in"),
@@ -139,9 +124,7 @@ ComplexHeatmap::draw(lgd, x = grid::unit(1.7, "in"), y = grid::unit(1, "in"))
 
 ```
 
-
 Great, after a lot of fiddling with graphics parameters, it doesn't look too bad. It can't be easily plot on A4 though! Paul also wants to use the heatmap to infer clusters of co-regulated peptides. That is a bit of a sloppy approach, so I'll build a cluster analysis.
-
 
 ## Estimating cluster counts
 
@@ -154,8 +137,7 @@ fviz_nbclust(sig_fc_mat, kmeans, method="wss", k.max = 50)
 
 ```
 
-The plot has a reasonable elbow, the line starts to show diminishing improvement at around 10 clusters, and that's a manageable number, so lets divide into the ten best clusters. 
-
+The plot has a reasonable elbow, the line starts to show diminishing improvement at around 10 clusters, and that's a manageable number, so lets divide into the ten best clusters.
 
 ## Summarising the clusters
 
@@ -185,7 +167,7 @@ ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
 
 ## Plot a heatmap of each cluster
 
-Clusters are in numeric order. A common legend is output at the end. 
+Clusters are in numeric order. A common legend is output at the end.
 
 ```{r, fig.height=9}
 make_hmap <- function(mat, km, col_order) {
@@ -223,7 +205,7 @@ ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
 
 Latterly, Frank has requested that I try 15 clusters based on an observation that the cluster 5 has some obvious sub-clusters in it. I do not think that this is a wise approach. Simply increasing the cluster number will not necessarily break only that cluster and rather it will break all proteins into different clusters. So it probably won't work (it might, though). Each cluster is a unit of minimal variance given the number of clusters. Increasing the number of clusters will just mean that the proteins have to be shared out differently. Each of the existing clusters minimises the variability over the entire dataset, no cluster is guaranteed to be minimal in and of itself so each could easily break when you try to re-do it with different parameters.
 
-Also there's no rational evidence in the idea of there being 15 clusters really in the data. We saw that 15 clusters doesn't reduce the overall variability very much (the point of inflection is closer to 10). The only reason we have to split the clusters up is that Frank 'believes' that there are sub clusters. Data says there isn't. It's okay for Frank to think this and do it post hoc but we can't justify it in the k-means approach. Really Frank is worried about explaining this to reviewers who don't understand the method, so the correct approach is to educate the reviewers about the method. Explicitly manually dividing the clusters and explaining that you did that is legit, you just have to be brave enough to do it, you can't misuse a method in a non-objective way and then hide behind the method as an objective way of splitting the clusters. When you're being non-objectibe and 'expert-led' then just say. 
+Also there's no rational evidence in the idea of there being 15 clusters really in the data. We saw that 15 clusters doesn't reduce the overall variability very much (the point of inflection is closer to 10). The only reason we have to split the clusters up is that Frank 'believes' that there are sub clusters. Data says there isn't. It's okay for Frank to think this and do it post hoc but we can't justify it in the k-means approach. Really Frank is worried about explaining this to reviewers who don't understand the method, so the correct approach is to educate the reviewers about the method. Explicitly manually dividing the clusters and explaining that you did that is legit, you just have to be brave enough to do it, you can't misuse a method in a non-objective way and then hide behind the method as an objective way of splitting the clusters. When you're being non-objectibe and 'expert-led' then just say.
 
 Nonetheless, here is 15 clusters
 
@@ -259,3 +241,310 @@ ComplexHeatmap::draw(lgd, x = grid::unit(6, "in"), y = grid::unit(0.5, "in"))
 
 Hope it works!
 
+# Heatmap showing selected targets
+
+Update: November 2022 by Clara
+
+Neftaly wants the heatmap only for a subset of selected peptides.
+
+## Load data
+
+Load the list of targets from the excel document sent by Neftaly.
+
+```{r}
+file = here::here("data", "raw", "Pmk1 direct targets PRM_101122.xlsx")
+
+targets = readxl::read_xlsx(file) %>% 
+  dplyr::mutate(gene_peptide = paste(`Phosphorylation position`, Peptide)) %>%
+  dplyr::select(gene_peptide)
+
+dplyr::glimpse(targets)
+```
+
+There are 74 selected peptides ...
+
+```{r}
+rownames(sig_fc_mat) %>% length()
+```
+
+... while there are 182 peptides showing significant FC for at least one of the comparison.
+
+Here, we want to focus on the "selected peptides"/"selected targets" identified by Neftaly and Frank, so we will extract these targets and corresponding FC values from the matrix `sig_fc_mat`: we create an empty data frame with the same rownames as the `sig_fc_mat` and for peptide id is found/present in the list of targets, we assign the value TRUE in our data table.
+
+```{r}
+# create a dataframe with all the selected phosphopeptides in sig_fc_mat
+selected_targets = data.frame(
+  id = rownames(sig_fc_mat) %>% as.vector(),
+  selected = rownames(sig_fc_mat) %in% targets$gene_peptide)
+
+dim(selected_targets)
+```
+
+## Missing target peptides
+
+Number of peptides with significantly different log fold change (FC) between for at least one of the comparison (wild type vs. mutant). These 182 peptides will be referred to as '*differential peptides*'.
+
+```{r}
+selected_targets %>% dplyr::filter(selected == TRUE) %>% dim()
+```
+
+Out of the 74 selected targets, only 68 are found in the matrix `sig_fc_mat` which indicates that the remaining 6 peptides can/should be removed from the list of selected targets?
+
+Look at the selected peptides that are not in the matrix `sig_fc_mat` :
+
+```{r}
+targets$gene_peptide %in% rownames(sig_fc_mat)
+targets %>% dplyr::filter(gene_peptide %in% rownames(sig_fc_mat) == FALSE)
+```
+
+**These 6 peptides will be excluded of the list of selected peptides and will not appear in the following heatmaps.**
+
+## Draw the heatmap of all 182 'differential peptides'
+
+Make the 'row heatmap annotation' (`row_ha`) using the data frame we just created with the selected targets. This will allow us to display a black/white column on the side of the heatmap.
+
+```{r}
+row_ha = ComplexHeatmap::rowAnnotation(selected_targets = selected_targets$selected,
+  col = list(selected_targets = c("TRUE" = "black", "FALSE" = "white")),
+  simple_anno_size = grid::unit(0.1, "cm"), 
+  show_legend = FALSE, 
+  annotation_label = "targets",
+  annotation_name_gp= grid::gpar(fontsize = 8),
+  #gp = grid::gpar(col = "black", lwd = 1)
+  gp = grid::gpar(col = "white", lwd = 1)
+  )
+```
+
+Labels (times) for the columns.
+
+```{r}
+col_labels = c('1h00', '1h30', '2h00', '4h00', '6h00', '1h00', '1h30', '2h00', '4h00', '6h00')
+```
+
+Use the split to separate the column between the wild type and the mutant
+
+```{r}
+col_split = factor(stringr::str_split(colnames(sig_fc_mat), "_", n = 2, simplify = TRUE)[,1], levels = c("Guy11", "dpmk1"))
+```
+
+Convert gi number to MGG numbers for consistency and allows for the display of the full peptide sequences as row labels if needed.
+
+```{r}
+# long row labels include the peptide sequences beside the gene name
+long_row_labels = rownames(sig_fc_mat) %>% 
+  stringr::str_replace(., 'gi\\|145610929\\|ref\\|XP_368444.2\\|', 'MGG_00800*') %>%
+  stringr::str_replace(., 'gi\\|39964959\\|ref\\|XP_365053.1\\|', 'MGG_09898*') %>%
+  stringr::str_replace(., 'gi\\|145612119\\|ref\\|XP_362522.2\\|', 'MGG_08105*') %>%
+  stringr::str_replace(., 'gi\\|145609287\\|ref\\|XP_367574.2\\|', 'MGG_13401*')
+
+# short row labels only display the gene names
+short_row_labels = paste0(stringr::str_split(long_row_labels, '\\) ', n = Inf, simplify = TRUE)[,1], ')')
+```
+
+Set the colour function to fill the heatmap - since this is a log fold change, diverging palettes are the most suitable!
+
+```{r}
+# RColorBrewer::display.brewer.all(colorblindFriendly = TRUE, type = "div")
+col_func = circlize::colorRamp2(
+    seq(ll, ul, length.out = 11),
+    rev(RColorBrewer::brewer.pal(11, "RdBu")))
+# "RdBu"
+```
+
+Draw the heatmap which will likely be used as supplemental figure.
+
+```{r}
+# PRM-182-diff-peptides.pdf
+prm_selected_targets <- ComplexHeatmap::Heatmap(sig_fc_mat, 
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = col_order,
+  right_annotation = row_ha,
+  row_labels = long_row_labels, # long_row_labels or short_rowlabels
+  height = grid::unit(25, "cm"),
+  width = grid::unit(4, "cm"),
+  row_dend_width = grid::unit(4, "cm"),
+  col = col_func,
+  show_heatmap_legend = TRUE,
+  heatmap_legend_param = list(title = "Log2FC", 
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")),
+  column_names_gp = grid::gpar(fontsize=10),
+  row_names_gp = grid::gpar(fontsize=4),
+  column_labels = col_labels,
+  #rect_gp = grid::gpar(col = "white", lwd = 1)
+  )
+prm_selected_targets
+# export as PDF A4 portrait
+```
+
+```{r}
+graphics_path = paste(here::here(), "graphics", sep = "/")
+plot_filename = paste(graphics_path, "007-prm_selected_targets.pdf", sep = "/")
+
+pdf(plot_filename, paper="a4")
+ComplexHeatmap::draw(prm_selected_targets)
+dev.off()
+```
+
+# Heatmap of the 68 selected targets ONLY
+
+Subset the selected targets from the matrix
+
+```{r}
+selection = selected_targets %>% dplyr::filter(selected == TRUE) %>% dplyr::select(id)
+select_sig_fc_mat = sig_fc_mat[selection$id,]
+```
+
+Make sure we get 68 targets
+
+```{r}
+select_sig_fc_mat %>% dim()
+```
+
+Use the split to separate the column between the wild type and the mutant
+
+```{r}
+col_split = factor(stringr::str_split(colnames(select_sig_fc_mat), "_", n = 2, 
+  simplify = TRUE)[,1], 
+  levels = c("Guy11", "dpmk1"))
+```
+
+Convert gi number to MGG numbers for consistency
+
+```{r}
+# long row labels include the peptide sequences beside the gene name
+long_row_labels = rownames(select_sig_fc_mat) %>% 
+  stringr::str_replace(., 'gi\\|145610929\\|ref\\|XP_368444.2\\|', 'MGG_00800*') %>%
+  stringr::str_replace(., 'gi\\|39964959\\|ref\\|XP_365053.1\\|', 'MGG_09898*') %>%
+  stringr::str_replace(., 'gi\\|145612119\\|ref\\|XP_362522.2\\|', 'MGG_08105*') %>%
+  stringr::str_replace(., 'gi\\|145609287\\|ref\\|XP_367574.2\\|', 'MGG_13401*')
+
+# short row labels only display the gene names
+short_row_labels = paste0(stringr::str_split(long_row_labels, '\\) ', n = Inf, simplify = TRUE)[,1], ')')
+```
+
+Draw the PRM heatmap that displays the selected targets/peptides with short labels.
+
+```{r}
+# PRM-68-selected-peptides.pdf
+prm_selected_targets_only <- ComplexHeatmap::Heatmap(select_sig_fc_mat, 
+  column_split = col_split, 
+  column_title = c('Guy11', expression(paste(Delta,"pmk1"))),
+  column_gap = grid::unit(0.25, "cm"),
+  column_order = col_order,
+  row_labels = short_row_labels,
+  height = grid::unit(25, "cm"),
+  width = grid::unit(4, "cm"),
+  row_dend_width = grid::unit(2.5, "cm"),
+  col = col_func,
+  show_heatmap_legend = TRUE,
+  heatmap_legend_param = list(title = "Log2FC", 
+    legend_direction = "vertical",
+    legend_height = grid::unit(5, "cm")),
+  column_names_gp = grid::gpar(fontsize = 10),
+  row_names_gp = grid::gpar(fontsize = 6),
+  column_labels = col_labels,
+  rect_gp = grid::gpar(col = "white", lwd = 1)
+  )
+prm_selected_targets_only
+```
+
+# Bar plots
+
+## Selected peptides
+
+The objective is to reproduce the barplots that were created by Bozeng to compare the log FC between conditions/treaments (time points; mutant vs. wild type) for each selected 'target' peptide.
+
+### Prepare data table
+
+Make a tibble `select_sig_fc_tb` from the matrix of selected targets `select_sig_fc_mat` and converting GI numbers to MGG numbers.
+
+```{r}
+select_sig_fc_tb = select_sig_fc_mat %>% 
+  dplyr::as_tibble() %>% 
+  dplyr::mutate(gene_id = rownames(select_sig_fc_mat)) %>% 
+  #dplyr::mutate(peptide = pepinfo$Peptide) %>%
+  dplyr::mutate(gene_id = stringr::str_replace(gene_id, 'gi\\|145610929\\|ref\\|XP_368444.2\\|', 'MGG_00800*')) %>%
+  dplyr::mutate(gene_id = stringr::str_replace(gene_id, 'gi\\|39964959\\|ref\\|XP_365053.1\\|', 'MGG_09898*'))
+```
+
+Let's melt the data frame using the `pivot_longer()`
+
+```{r, warning=FALSE}
+select_sig_fc_tb_melted = select_sig_fc_tb %>% 
+  tidyr::pivot_longer(cols = `Guy11_1-Guy11_0`:`dpmk1_6-dpmk1_0`, 
+    values_to = "FC", names_to = "comparison") %>%
+  tidyr::separate(comparison, c("treatment", "misc"), "_") %>%
+  tidyr::separate(misc, c("time", "misc1"), "-") %>%
+  dplyr::mutate(gene_id =  stringr::str_replace(gene_id, '\\) ', '\\)\n')) %>%
+  dplyr::select(gene_id, treatment, time, FC)
+```
+
+### Draw the bar plots
+
+Set colours from the same "red-blue" palette as the heatmap for consistency
+
+```{r}
+chosen_red = RColorBrewer::brewer.pal(6, 'RdBu')[1]
+chosen_blue = RColorBrewer::brewer.pal(6, 'RdBu')[6]
+```
+
+We use the `facet_wrap()` function from the `ggplot2` package to have consistent axis across bar plots.
+
+```{r}
+# PRM-68-selected-pep-barplots.pdf
+ggplot2::ggplot(select_sig_fc_tb_melted, aes(x = time, y = FC, fill = treatment)) + 
+  ggplot2::geom_bar(position="dodge", stat = "identity") + 
+  ggplot2::scale_fill_manual(values = c(chosen_red, chosen_blue), name = "", 
+    labels = c(expression(paste(Delta, "pmk1")), 'Guy11')) +
+  ggplot2::facet_wrap(~ gene_id, scales = "free") + 
+  ggplot2::theme_minimal() + 
+  ggplot2::theme(strip.text.x = element_text(size = 4))
+```
+
+Save the plot.
+
+```{r}
+graphics_dir = paste(here::here(), "graphics", sep = "/")
+pdf_filename = paste(graphics_dir, "007-prm-68-selected-pep-barplots.pdf", sep = "/")
+pdf(file = pdf_filename, width = 16, height = 9)
+last_plot()
+dev.off()
+```
+
+## Individual plots
+
+Rather than plotting one single plot with many facets, we will plot one plot per page.
+
+```{r}
+plot_list = list()
+for (p in select_sig_fc_tb_melted$gene_id %>% unique()) {
+  #print(p)
+  
+  df = select_sig_fc_tb_melted %>% 
+    dplyr::filter(gene_id == p) %>%
+    dplyr::mutate(treatment = factor(treatment, levels = c('Guy11', 'dpmk1')))
+  
+ plot = ggplot2::ggplot(df, aes(x = time, y = FC, fill = treatment)) + 
+  ggplot2::geom_bar(position="dodge", stat = "identity") + 
+  ggplot2::scale_fill_manual(
+    values = c(chosen_red, chosen_blue), 
+    name = "Genotypes", 
+    labels = c('Guy11', expression(paste(Delta, "pmk1")))) +
+  ggplot2::theme_classic() + 
+  ggplot2::theme(aspect.ratio = 1, 
+    plot.title = element_text(size = 10)) +
+  ggplot2::labs(title = p)
+ 
+  plot_list[[p]] = plot
+ }
+#plot
+```
+
+```{r, echo=FALSE, warning=FALSE}
+  pdf_filename = here::here("graphics", paste0("007-prm-bar-plots.pdf"))
+  ggpubr::ggexport(plot_list, filename = pdf_filename,
+    width = 6, height = 4)
+```

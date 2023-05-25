@@ -10,5 +10,6 @@ here
 dplyr
 tidyr
 readr
+stringr
 ggplot2
 factoextra

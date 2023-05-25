@@ -13,14 +13,27 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Libraries
 
-```{r, message=FALSE}
+```{r load-libraries, message=FALSE}
 library(readr)
 library(stringr)
 library(dplyr)
+library(here)
+
+library(ggplot2)
 
 library(mogo)
 library(clusterProfiler)
 library(viridis)
+```
+
+### Paths
+
+Let's set the paths to the directory containing the raw data and to the directory to which we will save our results.
+
+```{r set-paths}
+raw_data_path = paste(here(), "data", "raw", sep = "/")
+result_path = paste(here(), "results", sep = "/")
+graphics_path = paste(here(), "graphics", sep = "/")
 ```
 
 ## Cluster 1
@@ -30,7 +43,7 @@ library(viridis)
 Read data from csv file and select the transcript identifiers (e.g. `MGG_07200T0`).
 
 ```{r, message=FALSE}
-cluster1 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 1 _on_guy11_and_dpmk1.csv') %>% 
+cluster1 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 1 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -62,13 +75,13 @@ dotplot(enrich1) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich1_df = as.data.frame(enrich1) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster1_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster1_go_enrichment.csv", sep = "/")
 write_csv(enrich1_df, csv_filename)
 ```
 
@@ -79,7 +92,7 @@ write_csv(enrich1_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster2 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 2 _on_guy11_and_dpmk1.csv') %>% 
+cluster2 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 2 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -109,13 +122,13 @@ dotplot(enrich2) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich2_df = as.data.frame(enrich2) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster2_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster2_go_enrichment.csv", sep = "/")
 write_csv(enrich2_df, csv_filename)
 ```
 
@@ -126,7 +139,7 @@ write_csv(enrich2_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster3 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 3 _on_guy11_and_dpmk1.csv') %>% dplyr::select(id)
+cluster3 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 3 _on_guy11_and_dpmk1.csv') %>% dplyr::select(id)
 ```
 
 Keep only the gene id
@@ -151,13 +164,13 @@ barplot(enrich3) + scale_fill_viridis(direction = -1) + ggplot2::theme(aspect.ra
 dotplot(enrich3) + scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich3_df = as.data.frame(enrich3) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster3_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster3_go_enrichment.csv", sep = "/")
 write_csv(enrich3_df, csv_filename)
 ```
 
@@ -168,7 +181,7 @@ write_csv(enrich3_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster4 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 4 _on_guy11_and_dpmk1.csv') %>% 
+cluster4 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 4 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -198,13 +211,13 @@ dotplot(enrich4) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich4_df = as.data.frame(enrich4) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster4_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster4_go_enrichment.csv", sep = "/")
 write_csv(enrich3_df, csv_filename)
 ```
 
@@ -215,7 +228,7 @@ write_csv(enrich3_df, csv_filename)
 Read data from csv file.
 
 ```{r, message=FALSE}
-cluster5 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/analysis/010_kmeans_cluster_ 5 _on_guy11_and_dpmk1.csv') %>% 
+cluster5 = read_csv('/Users/jegoussc/GitHub/PD_PRO_1499_06122021_PRM2/results/010_kmeans_cluster_ 5 _on_guy11_and_dpmk1.csv') %>% 
   dplyr::select(id)
 ```
 
@@ -245,13 +258,192 @@ dotplot(enrich5) +
   scale_colour_viridis(direction = -1)
 ```
 
-### Write results in CSV 
+### Write results in CSV
 
 ```{r}
 enrich5_df = as.data.frame(enrich5) %>%
   select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
 
-csv_filename = "011_cluster5_go_enrichment.csv"
+csv_filename = paste(result_path, "011_cluster5_go_enrichment.csv", sep = "/")
 write_csv(enrich5_df, csv_filename)
 ```
 
+## Selected protein target
+
+### Load data
+
+Read data from csv file.
+
+```{r}
+
+data_filename = paste(raw_data_path, "Pmk1 direct targets PRM_101122.xlsx", sep = "/")
+
+targets = readxl::read_xlsx(data_filename) %>% 
+  dplyr::select(`Phosphorylation position`) %>% unique()
+```
+
+Keep only the gene id (for now I remove gi number) Replacement:
+
+gi\|145610929\|ref\|XP_368444.2\| MST7 = MGG_00800 gi\|39964959\|ref\|XP_365053.1\| MAC1 (S75) = MGG_09898
+
+```{r}
+targets2 = targets %>% 
+  dplyr::mutate(gene_ids = 
+      stringr::str_split(`Phosphorylation position`, " ", n = 2, simplify = TRUE)[,1]) %>%
+  dplyr::mutate(gene_ids = ifelse(`gene_ids` == 'gi|145610929|ref|XP_368444.2|', 
+    'MGG_00800', gene_ids)) %>%
+  dplyr::mutate(gene_ids = ifelse(`gene_ids` == 'gi|39964959|ref|XP_365053.1|', 
+    'MGG_09898', gene_ids))
+```
+
+In several cases, few selected peptides correspond to the same protein and thus the different lines/rows (peptides) are collapsed so that a single MGG number (gene/protein) is taken into consideration in the GO enrichment analysis resulting in a list of 31 proteins.
+
+```{r}
+gene_ids = targets2 %>% 
+  dplyr::mutate(gene_ids = stringr::str_split(`Phosphorylation position`, " ", n = 2, simplify = TRUE)[,1]) %>% 
+  dplyr::filter(str_detect(gene_ids, "^MGG")) %>% 
+  dplyr::select(gene_ids)  %>% 
+  unique()
+```
+
+### GO Enrichment
+
+```{r, message=FALSE}
+enrich_targets <- do_enrich(gene_ids$gene_ids)
+```
+
+```{r, message=FALSE}
+barplot(enrich_targets) + 
+  #scale_fill_viridis(direction = -1) + 
+  ggplot2::scale_fill_distiller(type = "seq", direction = -1, palette = 'Reds') +
+  ggplot2::theme(aspect.ratio = 1)
+```
+
+```{r, message=FALSE}
+# PRM-GO-dotplot.pdf
+dotplot(enrich_targets) + 
+  ggplot2::scale_colour_distiller(type = "seq", direction = -1, palette = 'Reds', limits = c(0, 0.005)) 
+
+# limits and directions are set so that the more intense the colour is, more smaller/better the p-value is
+```
+
+### Write results in CSV
+
+```{r}
+enrich_targets_df = as.data.frame(enrich_targets) %>%
+  select(ID, geneID, Description, GeneRatio, BgRatio, pvalue, p.adjust, qvalue)
+
+csv_filename = paste(result_path, "011_targets_go_enrichment.csv", sep = "/")
+write_csv(enrich_targets_df, csv_filename)
+```
+
+# Summary
+
+February 2023: New request from Neftaly.
+
+Let's summarise all the go enrichement analysis in a single dot plot.
+
+First, for all the data frame build previously, we add a column with the cluster number (as categorial variable, not numerical).
+
+```{r}
+enrich1_df$cluster = "1"
+enrich2_df$cluster = "2"
+enrich3_df$cluster = "3"
+enrich4_df$cluster = "4"
+enrich5_df$cluster = "5"
+```
+
+Now we can bind all these data frames together.
+
+```{r}
+enrichment_summary_df = rbind(enrich1_df, enrich2_df, 
+  enrich3_df, enrich4_df, enrich5_df)
+```
+
+We transform the current gene ratio (50/100) to its numerical value (0.5).
+
+```{r}
+enrichment_summary_df = enrichment_summary_df |> mutate(
+  gene.ratio = sapply(strsplit(enrichment_summary_df$GeneRatio, "/"), 
+    function(x) as.numeric(x[1])/as.numeric(x[2]))) 
+```
+
+We draw th plot
+
+```{r}
+ggplot(enrichment_summary_df,
+  aes(x = cluster, y = Description, size = gene.ratio, colour = p.adjust)) + 
+  geom_point()
+```
+
+```{r}
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
+
+```
+
+Sort out these GO terms!
+
+```{r}
+library(GO.db)
+library(viridis)
+
+ontology = unlist(Ontology(GOTERM))
+enrichment_summary_df$ont = ontology[enrichment_summary_df$ID]
+
+enrichment_summary_df = enrichment_summary_df |> mutate(
+  labels = paste0(Description, " (", ID, ")")
+  ) 
+
+ggplot(enrichment_summary_df,
+  aes(x = cluster, y = labels, size = gene.ratio, colour = p.adjust)) + 
+  #scale_color_viridis(direction = -1) +
+  geom_point() + facet_grid(ont~., scales = "free", space = "free")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v1.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
+
+```
+
+What are these GO terms that are displayed as "NA".
+
+-   [GO:0007184](https://www.ebi.ac.uk/QuickGO/term/GO:0004871#:~:text=Definition%20(GO%3A0004871%20GONUTS%20page)&text=Conveys%20a%20signal%20across%20a,order%20to%20trigger%20a%20response.){.uri}: OBSOLETE. Obsolete signal transducer activity \>\> This term was obsoleted because it was not clearly defined and is not a useful grouping term.
+-   [GO:1990939](https://www.ebi.ac.uk/QuickGO/term/GO:1990939): this is a secondary identifier, within "**Molecular Function",** primary id is <GO:0003777>.
+
+After discussion with Neftaly, we will remove the obsolete term and move the ATP-dependant microtubule to MF:
+
+```{r}
+cleaned_enrichment_summary_df = enrichment_summary_df %>%
+  filter(labels != "obsolete signal transducer activity (GO:0004871)") %>%
+  mutate(ont = ifelse(labels == "ATP-dependent microtubule motor activity (GO:1990939)", "MF", ont))
+```
+
+```{r}
+ggplot(cleaned_enrichment_summary_df,
+  aes(x = cluster, y = labels, size = gene.ratio, colour = p.adjust)) + 
+  scale_color_viridis(direction = -1) +
+  geom_point() + 
+  facet_grid(ont~., scales = "free", space = "free")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v2.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 7, height = 10)
+```
+
+```{r}
+ggplot(enrichment_summary_df,
+  aes(
+    #x = cluster,
+    x = ordered(cluster, levels = c("5", "4", "3", "2", "1")), 
+    y = labels, size = gene.ratio, colour = p.adjust)) + 
+  scale_color_viridis(option = "B", direction = -1) +
+  geom_point() + facet_grid(~ont, scales = "free", space = "free") +
+ coord_flip() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + labs(x = "clusters")
+
+plot_filename = paste(graphics_path, "011-go-enrichment-summary-v3.pdf", sep = "/")
+ggsave(file = plot_filename,
+  plot = last_plot(), width = 10, height = 7)
+```
